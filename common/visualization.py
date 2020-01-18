@@ -91,10 +91,8 @@ class Sequencial_animation():
     def call(self,keypoints, poses, skeleton, fps, bitrate, output, viewport,
                         limit=-1, downsample=1, input_video_path=None, input_video_skip=0):
 
-        trajectories = []
         # for index, (title, data) in enumerate(poses.items()):
         data = poses['Reconstruction']
-        trajectories.append(data[:, 0, [0, 1]])
 
         poses=[data]
         # Decode video
@@ -115,7 +113,6 @@ class Sequencial_animation():
             all_frames = self.downsample_tensor(np.array(all_frames), downsample).astype('uint8')
             for idx in range( self.len_poses):
                 poses[idx] = self.downsample_tensor(poses[idx], downsample)
-                trajectories[idx] = self.downsample_tensor(trajectories[idx], downsample)
             fps /= downsample
 
         if limit < 1:
@@ -150,8 +147,6 @@ class Sequencial_animation():
                 self.initialized = True
             else:
                 self.image = self.ax_in.imshow(all_frames[i], aspect='equal')
-
-                print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
                 self.image.set_data(all_frames[i])
 
                 for j, j_parent in enumerate(parents):
