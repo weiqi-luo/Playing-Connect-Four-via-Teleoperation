@@ -20,7 +20,7 @@ import matplotlib
 matplotlib.use( 'tkagg' )
 
 class Sequencial_animation():
-    def __init__(self,size=6):
+    def __init__(self,azim,size=6):
         plt.ion()   # continuously plot
         # plt.ioff()
         self.len_poses=1
@@ -32,8 +32,21 @@ class Sequencial_animation():
         self.ax_in.set_title('Input')
         
         self.fig.tight_layout()
+        # prevent wired error
+        _ = Axes3D.__class__.__name__
 
+        radius = 1.7
 
+        self.ax_3d = self.fig.add_subplot(1, 1 +  self.len_poses, 2, projection='3d')
+        self.ax_3d.view_init(elev=15., azim=azim)
+        self.ax_3d.set_xlim3d([-radius / 2, radius / 2])
+        self.ax_3d.set_zlim3d([0, radius])
+        self.ax_3d.set_ylim3d([-radius / 2, radius / 2])
+        self.ax_3d.set_xticklabels([])
+        self.ax_3d.set_yticklabels([])
+        self.ax_3d.set_zticklabels([])
+        self.ax_3d.dist = 12.5
+        self.ax_3d.set_title('Reconstruction')  
 
     def ckpt_time(self,ckpt=None, display=0, desc=''):
         if not ckpt:
@@ -67,7 +80,7 @@ class Sequencial_animation():
         return np.mean(X[:length].reshape(-1, factor, *X.shape[1:]), axis=1)
 
 
-    def render_animation(self,keypoints, poses, skeleton, fps, bitrate, azim, output, viewport,
+    def call(self,keypoints, poses, skeleton, fps, bitrate, output, viewport,
                         limit=-1, downsample=1, input_video_path=None, input_video_skip=0):
         """
         TODO
@@ -79,30 +92,15 @@ class Sequencial_animation():
         -- 'filename.gif': render and export the animation a gif file (requires imagemagick).
         """
 
-        # prevent wired error
-        _ = Axes3D.__class__.__name__
 
-        ax_3d = []
         lines_3d = [[]]
         trajectories = []
         radius = 1.7
-        for index, (title, data) in enumerate(poses.items()):
-            print("a")
-            ax = self.fig.add_subplot(1, 1 +  self.len_poses, index + 2, projection='3d')
-            ax.view_init(elev=15., azim=azim)
-            ax.set_xlim3d([-radius / 2, radius / 2])
-            ax.set_zlim3d([0, radius])
-            ax.set_ylim3d([-radius / 2, radius / 2])
-            # ax.set_aspect('equal')
-            ax.set_xticklabels([])
-            ax.set_yticklabels([])
-            ax.set_zticklabels([])
-            ax.dist = 12.5
-            ax.set_title('Reconstruction')  # , pad=35
-            ax_3d.append(ax)
+        # for index, (title, data) in enumerate(poses.items()):
+        data = poses['Reconstruction']
         trajectories.append(data[:, 0, [0, 1]])
-        poses = list(poses.values())
 
+        poses=[data]
         # Decode video
         if input_video_path is None:
             # Black background
@@ -138,6 +136,8 @@ class Sequencial_animation():
         pbar = tqdm(total=limit)
 
         def update_video(i):
+            self.ax_in.clear()
+            # self.ax_3d.clear()
             nonlocal initialized, image, lines, points
 
             # Update 2D poses
@@ -149,16 +149,17 @@ class Sequencial_animation():
                         continue
 
                     col = 'red' if j in skeleton.joints_right() else 'black'
-                    for n, ax in enumerate(ax_3d):
-                        pos = poses[n][i]
-                        lines_3d[n].append(ax.plot([pos[j, 0], pos[j_parent, 0]],
-                                                [pos[j, 1], pos[j_parent, 1]],
-                                                [pos[j, 2], pos[j_parent, 2]], zdir='z', c=col))
+                    n=0
+                    pos = poses[n][i]
+                    lines_3d[n].append(self.ax_3d.plot([pos[j, 0], pos[j_parent, 0]],
+                                            [pos[j, 1], pos[j_parent, 1]],
+                                            [pos[j, 2], pos[j_parent, 2]], zdir='z', c=col))
 
                 points = self.ax_in.scatter(*keypoints[i].T, 5, color='red', edgecolors='white', zorder=10)
 
                 initialized = True
             else:
+                print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
                 image.set_data(all_frames[i])
 
                 for j, j_parent in enumerate(parents):
@@ -169,7 +170,7 @@ class Sequencial_animation():
                     #     lines[j - 1][0].set_data([keypoints[i, j, 0], keypoints[i, j_parent, 0]],
                     #                              [keypoints[i, j, 1], keypoints[i, j_parent, 1]])
 
-                    for n, ax in enumerate(ax_3d):
+                    for n, ax in enumerate(self.ax_3d):
                         pos = poses[n][i]
                         lines_3d[n][j - 1][0].set_xdata([pos[j, 0], pos[j_parent, 0]])
                         lines_3d[n][j - 1][0].set_ydata([pos[j, 1], pos[j_parent, 1]])
@@ -184,7 +185,6 @@ class Sequencial_animation():
         update_video(0)
         plt.draw()
         plt.pause(0.0000001)
-
 
     def render_animation_test(self,keypoints, poses, skeleton, fps, bitrate, azim, output, viewport, limit=-1, downsample=1, size=6, input_video_frame=None,
                             input_video_skip=0, num=None):
