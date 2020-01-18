@@ -161,27 +161,26 @@ class Sequencial_animation():
                 points = self.ax_in.scatter(*keypoints[i].T, 5, color='red', edgecolors='white', zorder=10)
 
                 initialized = True
-            # else:
-            #     print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-            #     image.set_data(all_frames[i])
+            else:
+                print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                image.set_data(all_frames[i])
 
-            #     for j, j_parent in enumerate(parents):
-            #         if j_parent == -1:
-            #             continue
+                for j, j_parent in enumerate(parents):
+                    if j_parent == -1:
+                        continue
 
-            #         # if len(parents) == keypoints.shape[1] and 1 == 2:
-            #         #     lines[j - 1][0].set_data([keypoints[i, j, 0], keypoints[i, j_parent, 0]],
-            #         #                              [keypoints[i, j, 1], keypoints[i, j_parent, 1]])
+                    # if len(parents) == keypoints.shape[1] and 1 == 2:
+                    #     lines[j - 1][0].set_data([keypoints[i, j, 0], keypoints[i, j_parent, 0]],
+                    #                              [keypoints[i, j, 1], keypoints[i, j_parent, 1]])
 
-            #         for n, ax in enumerate(self.ax_3d):
-            #             pos = poses[n][i]
-            #             lines_3d[n][j - 1][0].set_xdata([pos[j, 0], pos[j_parent, 0]])
-            #             lines_3d[n][j - 1][0].set_ydata([pos[j, 1], pos[j_parent, 1]])
-            #             lines_3d[n][j - 1][0].set_3d_properties([pos[j, 2], pos[j_parent, 2]], zdir='z')
+                    for n, ax in enumerate(self.ax_3d):
+                        pos = poses[n][i]
+                        lines_3d[n][j - 1][0].set_xdata([pos[j, 0], pos[j_parent, 0]])
+                        lines_3d[n][j - 1][0].set_ydata([pos[j, 1], pos[j_parent, 1]])
+                        lines_3d[n][j - 1][0].set_3d_properties([pos[j, 2], pos[j_parent, 2]], zdir='z')
 
-            #     points.set_offsets(keypoints[i])
+                points.set_offsets(keypoints[i])
 
-            # pbar.update()
 
 
         # anim = FuncAnimation(self.fig, update_video, frames=limit, interval=1000.0 / fps, repeat=False)
