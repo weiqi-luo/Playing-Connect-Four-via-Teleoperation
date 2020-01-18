@@ -168,16 +168,11 @@ class Sequencial_animation():
                 for j, j_parent in enumerate(parents):
                     if j_parent == -1:
                         continue
-
-                    # if len(parents) == keypoints.shape[1] and 1 == 2:
-                    #     lines[j - 1][0].set_data([keypoints[i, j, 0], keypoints[i, j_parent, 0]],
-                    #                              [keypoints[i, j, 1], keypoints[i, j_parent, 1]])
-
-                    for n, ax in enumerate(self.ax_3d):
-                        pos = poses[n][i]
-                        lines_3d[n][j - 1][0].set_xdata([pos[j, 0], pos[j_parent, 0]])
-                        lines_3d[n][j - 1][0].set_ydata([pos[j, 1], pos[j_parent, 1]])
-                        lines_3d[n][j - 1][0].set_3d_properties([pos[j, 2], pos[j_parent, 2]], zdir='z')
+                    n=0
+                    pos = poses[n][i]
+                    lines_3d[n][j - 1][0].set_xdata([pos[j, 0], pos[j_parent, 0]])
+                    lines_3d[n][j - 1][0].set_ydata([pos[j, 1], pos[j_parent, 1]])
+                    lines_3d[n][j - 1][0].set_3d_properties([pos[j, 2], pos[j_parent, 2]], zdir='z')
 
                 points.set_offsets(keypoints[i])
 
