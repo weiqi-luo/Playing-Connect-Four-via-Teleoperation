@@ -106,7 +106,7 @@ def main(args):
     gen = UnchunkedGenerator(None, None, [input_keypoints],
                              pad=pad, causal_shift=causal_shift, augment=args.test_time_augmentation,
                              kps_left=kps_left, kps_right=kps_right, joints_left=joints_left, joints_right=joints_right)
-    prediction = evaluate(gen, model_pos, return_predictions=True)
+    prediction = evaluate(input_keypoints, pad, model_pos, return_predictions=True)
 
     # save 3D joint points
     np.save('outputs/test_3d_output.npy', prediction, allow_pickle=True)

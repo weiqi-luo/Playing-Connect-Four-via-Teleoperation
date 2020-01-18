@@ -199,6 +199,7 @@ class UnchunkedGenerator:
         self.joints_right = joints_right
 
         self.pad = pad
+        print(self.pad)
         self.causal_shift = causal_shift
         self.cameras = [] if cameras is None else cameras
         self.poses_3d = [] if poses_3d is None else poses_3d
@@ -227,6 +228,7 @@ class UnchunkedGenerator:
             batch_2d = np.expand_dims(np.pad(seq_2d,
                                              ((self.pad + self.causal_shift, self.pad - self.causal_shift), (0, 0), (0, 0)),
                                              'edge'), axis=0)
+            print(self.pad,self.causal_shift,((self.pad + self.causal_shift, self.pad - self.causal_shift), (0, 0), (0, 0)))
             if self.augment: #* False
                 # Append flipped version
                 if batch_cam is not None:
