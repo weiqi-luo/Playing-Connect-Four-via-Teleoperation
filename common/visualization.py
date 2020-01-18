@@ -128,8 +128,6 @@ class Sequencial_animation():
                 trajectories[idx] = self.downsample_tensor(trajectories[idx], downsample)
             fps /= downsample
 
-        lines = []
-
         if limit < 1:
             limit = len(all_frames)
         else:
@@ -139,9 +137,6 @@ class Sequencial_animation():
         # pbar = tqdm(total=limit)
 
         def update_video(i):
-            # self.ax_in.clear()
-            # self.ax_3d.clear()
-            nonlocal lines
 
             # Update 2D poses
             if not self.initialized:
