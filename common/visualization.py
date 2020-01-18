@@ -140,10 +140,6 @@ class Sequencial_animation():
         def update_video(i):
             nonlocal initialized, image, lines, points
 
-            # for n, ax in enumerate(ax_3d):
-                # ax.set_xlim3d([-radius / 2 + trajectories[n][i, 0], radius / 2 + trajectories[n][i, 0]])
-                # ax.set_ylim3d([-radius / 2 + trajectories[n][i, 1], radius / 2 + trajectories[n][i, 1]])
-
             # Update 2D poses
             if not initialized:
                 image = self.ax_in.imshow(all_frames[i], aspect='equal')
@@ -151,11 +147,6 @@ class Sequencial_animation():
                 for j, j_parent in enumerate(parents):
                     if j_parent == -1:
                         continue
-
-                    # if len(parents) == keypoints.shape[1] and 1 == 2:
-                    #     # Draw skeleton only if keypoints match (otherwise we don't have the parents definition)
-                    #     lines.append(self.ax_in.plot([keypoints[i, j, 0], keypoints[i, j_parent, 0]],
-                    #                             [keypoints[i, j, 1], keypoints[i, j_parent, 1]], color='pink'))
 
                     col = 'red' if j in skeleton.joints_right() else 'black'
                     for n, ax in enumerate(ax_3d):
@@ -193,19 +184,6 @@ class Sequencial_animation():
         update_video(0)
         plt.draw()
         plt.pause(0.0000001)
-        # sys.exit()
-        # plt.show()
-        ## save the animation 
-        # if output.endswith('.mp4'):
-        #     Writer = writers['ffmpeg']
-        #     writer = Writer(fps=fps, metadata={}, bitrate=bitrate)
-        #     anim.save(output, writer=writer)
-        # elif output.endswith('.gif'):
-        #     anim.save(output, dpi=60, writer='imagemagick')
-        # else:
-        #     raise ValueError('Unsupported output format (only .mp4 and .gif are supported)')
-        # pbar.close()
-        # plt.close()
 
 
     def render_animation_test(self,keypoints, poses, skeleton, fps, bitrate, azim, output, viewport, limit=-1, downsample=1, size=6, input_video_frame=None,
