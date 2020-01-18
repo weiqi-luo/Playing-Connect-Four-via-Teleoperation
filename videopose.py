@@ -63,7 +63,7 @@ def main(args):
 
     assert detector_2d, 'detector_2d should be in ({alpha, hr, open}_pose)'
 
-    # 2D kpts loads or generate
+    #! 2D kpts loads or generate
     if not args.input_npz:
         video_name = args.viz_video
         keypoints = detector_2d(video_name)
@@ -75,7 +75,7 @@ def main(args):
     kps_left, kps_right = list(keypoints_symmetry[0]), list(keypoints_symmetry[1])
     joints_left, joints_right = list([4, 5, 6, 11, 12, 13]), list([1, 2, 3, 14, 15, 16])
 
-    # normlization keypoints  Suppose using the camera parameter
+    #! normlization keypoints  Suppose using the camera parameter
     keypoints = normalize_screen_coordinates(keypoints[..., :2], w=1000, h=1002)
 
     model_pos = TemporalModel(17, 2, 17, filter_widths=[3, 3, 3, 3, 3], causal=args.causal, dropout=args.dropout, channels=args.channels,
@@ -87,7 +87,7 @@ def main(args):
     ckpt, time1 = ckpt_time(time0)
     print('-------------- load data spends {:.2f} seconds'.format(ckpt))
 
-    # load trained model
+    #! load trained model
     chk_filename = os.path.join(args.checkpoint, args.resume if args.resume else args.evaluate)
     print('Loading checkpoint', chk_filename)
     checkpoint = torch.load(chk_filename, map_location=lambda storage, loc: storage)  # 把loc映射到storage
@@ -122,6 +122,7 @@ def main(args):
     ckpt, time3 = ckpt_time(time2)
     print('-------------- generate reconstruction 3D data spends {:.2f} seconds'.format(ckpt))
 
+    #! Visualization
     if not args.viz_output:
         args.viz_output = 'outputs/alpha_result.mp4'
 
@@ -130,7 +131,7 @@ def main(args):
                      Skeleton(), 25, args.viz_bitrate, np.array(70., dtype=np.float32), args.viz_output,
                      limit=args.viz_limit, downsample=args.viz_downsample, size=args.viz_size,
                      input_video_path=args.viz_video, viewport=(1000, 1002),
-                     input_video_skip=args.viz_skip)
+                     input_video_skip=args.viz_skip, interactive=True)
 
     ckpt, time4 = ckpt_time(time3)
     print('total spend {:2f} second'.format(ckpt))
@@ -161,4 +162,4 @@ def inference_video(video_path, detector_2d):
 
 
 if __name__ == '__main__':
-    inference_video('outputs/kunkun_cut.mp4', 'alpha_pose')
+    inference_video('outputs/dancing_Trim.mp4', 'alpha_pose')
