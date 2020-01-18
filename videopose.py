@@ -142,8 +142,9 @@ def main(args):
         if not args.viz_output:
             args.viz_output = 'outputs/alpha_result.mp4'
 
-        from common.visualization import render_animation
-        render_animation(input_keypoints, anim_output,
+        from common.visualization import Sequencial_animation
+        sequencial_animation = Sequencial_animation()
+        sequencial_animation.render_animation(input_keypoints, anim_output,
                         Skeleton(), 25, args.viz_bitrate, np.array(70., dtype=np.float32), args.viz_output,
                         limit=args.viz_limit, downsample=args.viz_downsample, size=args.viz_size,
                         input_video_path=args.viz_video, viewport=(1000, 1002),
