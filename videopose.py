@@ -116,6 +116,7 @@ def main(args):
 
     # We don't have the trajectory, but at least we can rebase the height
     prediction[:, :, 2] -= np.min(prediction[:, :, 2])
+    print(prediction.shape)
     anim_output = {'Reconstruction': prediction}
     input_keypoints = image_coordinates(input_keypoints[..., :2], w=1000, h=1002)
 
@@ -131,7 +132,7 @@ def main(args):
                      Skeleton(), 25, args.viz_bitrate, np.array(70., dtype=np.float32), args.viz_output,
                      limit=args.viz_limit, downsample=args.viz_downsample, size=args.viz_size,
                      input_video_path=args.viz_video, viewport=(1000, 1002),
-                     input_video_skip=args.viz_skip, interactive=True)
+                     input_video_skip=args.viz_skip)
 
     ckpt, time4 = ckpt_time(time3)
     print('total spend {:2f} second'.format(ckpt))
@@ -145,6 +146,7 @@ def inference_video(video_path, detector_2d):
     :return: None
     """
     args = parse_args()
+    print(args)
 
     args.detector_2d = detector_2d
     dir_name = os.path.dirname(video_path)

@@ -10,14 +10,14 @@ import time
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-import matplotlib
 from matplotlib.animation import FuncAnimation, writers
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from mpl_toolkits.mplot3d import Axes3D
 from tqdm import tqdm
 
 from common.utils import read_video
-
+import matplotlib
+matplotlib.use( 'tkagg' )
 
 def ckpt_time(ckpt=None, display=0, desc=''):
     if not ckpt:
@@ -52,7 +52,7 @@ def downsample_tensor(X, factor):
 
 
 def render_animation(keypoints, poses, skeleton, fps, bitrate, azim, output, viewport,
-                     limit=-1, downsample=1, size=6, input_video_path=None, input_video_skip=0, interactive=True):
+                     limit=-1, downsample=1, size=6, input_video_path=None, input_video_skip=0):
     """
     TODO
     Render an animation. The supported output modes are:
@@ -182,21 +182,18 @@ def render_animation(keypoints, poses, skeleton, fps, bitrate, azim, output, vie
     fig.tight_layout()
 
     anim = FuncAnimation(fig, update_video, frames=limit, interval=1000.0 / fps, repeat=False)
-    if interactive:
-        print("interactive")
-        matplotlib.use( 'tkagg' )
-        plt.show()
-    else:
-        if output.endswith('.mp4'):
-            Writer = writers['ffmpeg']
-            writer = Writer(fps=fps, metadata={}, bitrate=bitrate)
-            anim.save(output, writer=writer)
-        elif output.endswith('.gif'):
-            anim.save(output, dpi=60, writer='imagemagick')
-        else:
-            raise ValueError('Unsupported output format (only .mp4 and .gif are supported)')
-    pbar.close()
-    plt.close()
+    plt.show()
+    ## save the animation 
+    # if output.endswith('.mp4'):
+    #     Writer = writers['ffmpeg']
+    #     writer = Writer(fps=fps, metadata={}, bitrate=bitrate)
+    #     anim.save(output, writer=writer)
+    # elif output.endswith('.gif'):
+    #     anim.save(output, dpi=60, writer='imagemagick')
+    # else:
+    #     raise ValueError('Unsupported output format (only .mp4 and .gif are supported)')
+    # pbar.close()
+    # plt.close()
 
 
 def render_animation_test(keypoints, poses, skeleton, fps, bitrate, azim, output, viewport, limit=-1, downsample=1, size=6, input_video_frame=None,

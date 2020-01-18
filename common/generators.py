@@ -218,13 +218,16 @@ class UnchunkedGenerator:
 
     def next_epoch(self):
         for seq_cam, seq_3d, seq_2d in zip_longest(self.cameras, self.poses_3d, self.poses_2d):
+            
+            # seq_2d = seq_2d[:9]
+            
             batch_cam = None if seq_cam is None else np.expand_dims(seq_cam, axis=0)
             batch_3d = None if seq_3d is None else np.expand_dims(seq_3d, axis=0)
             # 2D input padding to compensate for valid convolutions, per side (depends on the receptive field)
             batch_2d = np.expand_dims(np.pad(seq_2d,
                                              ((self.pad + self.causal_shift, self.pad - self.causal_shift), (0, 0), (0, 0)),
                                              'edge'), axis=0)
-            if self.augment:
+            if self.augment: #* False
                 # Append flipped version
                 if batch_cam is not None:
                     batch_cam = np.concatenate((batch_cam, batch_cam), axis=0)
@@ -239,5 +242,14 @@ class UnchunkedGenerator:
                 batch_2d = np.concatenate((batch_2d, batch_2d), axis=0)
                 batch_2d[1, :, :, 0] *= -1
                 batch_2d[1, :, self.kps_left + self.kps_right] = batch_2d[1, :, self.kps_right + self.kps_left]
+
+            try:
+                # print(type(self.cameras), type(self.poses_3d), type())
+                # print(type(seq_cam), type(seq_3d), type())
+                # print(type(batch_cam), type(batch_3d), type())  #* Nonetype
+                print(self.poses_2d[0].shape, seq_2d.shape, batch_2d.shape)
+            except AttributeError as err:
+                print("error")
+                print(err)
 
             yield batch_cam, batch_3d, batch_2d
