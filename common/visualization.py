@@ -90,16 +90,6 @@ class Sequencial_animation():
 
     def call(self,keypoints, poses, skeleton, fps, bitrate, output, viewport,
                         limit=-1, downsample=1, input_video_path=None, input_video_skip=0):
-        """
-        TODO
-        Render an animation. The supported output modes are:
-        -- 'interactive': display an interactive self.figure
-                        (also works on notebooks if associated with %matplotlib inline)
-        -- 'html': render the animation as HTML5 video. Can be displayed in a notebook using HTML(...).
-        -- 'filename.mp4': render and export the animation as an h264 video (requires ffmpeg).
-        -- 'filename.gif': render and export the animation a gif file (requires imagemagick).
-        """
-
 
         trajectories = []
         # for index, (title, data) in enumerate(poses.items()):
@@ -178,7 +168,7 @@ class Sequencial_animation():
 
 
         # anim = FuncAnimation(self.fig, update_video, frames=limit, interval=1000.0 / fps, repeat=False)
-        update_video(0)
+        update_video(8)
         plt.draw()
         plt.pause(0.0000001)
 
