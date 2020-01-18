@@ -88,13 +88,10 @@ class Sequencial_animation():
         return np.mean(X[:length].reshape(-1, factor, *X.shape[1:]), axis=1)
 
 
-    def call(self,keypoints, poses, skeleton, fps, bitrate, output, viewport,
+    def call(self,keypoints, data, skeleton, fps, bitrate, output, viewport,
                         limit=-1, downsample=1, input_video_path=None, input_video_skip=0):
 
-        # for index, (title, data) in enumerate(poses.items()):
-        data = poses['Reconstruction']
 
-        poses=[data]
         # Decode video
         if input_video_path is None:
             # Black background
@@ -111,8 +108,7 @@ class Sequencial_animation():
         if downsample > 1:
             keypoints = self.downsample_tensor(keypoints, downsample)
             all_frames = self.downsample_tensor(np.array(all_frames), downsample).astype('uint8')
-            for idx in range( self.len_poses):
-                poses[idx] = self.downsample_tensor(poses[idx], downsample)
+            data = self.downsample_tensor(data, downsample)
             fps /= downsample
 
         if limit < 1:
@@ -135,7 +131,7 @@ class Sequencial_animation():
 
                     col = 'red' if j in skeleton.joints_right() else 'black'
                     n=0
-                    pos = poses[n][i]
+                    pos = data[i]
                     self.lines_3d[n].append(self.ax_3d.plot([pos[j, 0], pos[j_parent, 0]],
                                             [pos[j, 1], pos[j_parent, 1]],
                                             [pos[j, 2], pos[j_parent, 2]], zdir='z', c=col))
@@ -153,7 +149,7 @@ class Sequencial_animation():
                     if j_parent == -1:
                         continue
                     n=0
-                    pos = poses[n][i]
+                    pos = data[i]
                     self.lines_3d[n][j - 1][0].set_xdata([pos[j, 0], pos[j_parent, 0]])
                     self.lines_3d[n][j - 1][0].set_ydata([pos[j, 1], pos[j_parent, 1]])
                     self.lines_3d[n][j - 1][0].set_3d_properties([pos[j, 2], pos[j_parent, 2]], zdir='z')

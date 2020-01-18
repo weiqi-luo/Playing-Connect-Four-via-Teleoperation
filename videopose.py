@@ -142,7 +142,7 @@ def main(args):
         if not args.viz_output:
             args.viz_output = 'outputs/alpha_result.mp4'
 
-        sequencial_animation.call(input_keypoints, anim_output,
+        sequencial_animation.call(input_keypoints, prediction,
                         Skeleton(), 25, args.viz_bitrate, args.viz_output,
                         limit=args.viz_limit, downsample=args.viz_downsample, 
                         input_video_path=args.viz_video, viewport=(1000, 1002),
