@@ -83,7 +83,7 @@ def main(args):
     count = 0
     keypoints = npz['kpts']  # (N, 17, 2)
     from common.visualization import Sequencial_animation
-    sequencial_animation = Sequencial_animation(size=args.viz_size,azim=np.array(70., dtype=np.float32),)
+    sequencial_animation = Sequencial_animation(size=args.viz_size)
     for kp in keypoints:
         print(count)
         kp_deque.append(kp)
@@ -134,7 +134,7 @@ def main(args):
         # We don't have the trajectory, but at least we can rebase the height
         prediction[:, :, 2] -= np.min(prediction[:, :, 2])
         print(prediction.shape)
-        # anim_output = {'Reconstruction': prediction}
+        anim_output = {'Reconstruction': prediction}
         input_keypoints = image_coordinates(input_keypoints[..., :2], w=1000, h=1002)
 
         ckpt, time3 = ckpt_time(time2)
@@ -144,8 +144,8 @@ def main(args):
         if not args.viz_output:
             args.viz_output = 'outputs/alpha_result.mp4'
 
-        sequencial_animation.render_animation(input_keypoints, prediction,
-                        Skeleton(), 25, args.viz_bitrate, args.viz_output,
+        sequencial_animation.render_animation(input_keypoints, anim_output,
+                        Skeleton(), 25, args.viz_bitrate, np.array(70., dtype=np.float32), args.viz_output,
                         limit=args.viz_limit, downsample=args.viz_downsample, 
                         input_video_path=args.viz_video, viewport=(1000, 1002),
                         input_video_skip=count)

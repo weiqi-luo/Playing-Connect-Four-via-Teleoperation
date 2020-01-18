@@ -20,7 +20,7 @@ import matplotlib
 matplotlib.use( 'tkagg' )
 
 class Sequencial_animation():
-    def __init__(self,azim,size=6):
+    def __init__(self,size=6):
         plt.ion()   # continuously plot
         # plt.ioff()
         self.len_poses=1
@@ -32,25 +32,6 @@ class Sequencial_animation():
         self.ax_in.set_title('Input')
         
         self.fig.tight_layout()
-
-
-        # prevent wired error
-        _ = Axes3D.__class__.__name__
-
-        self.ax_3d = []
-        radius = 1.7
-        ax = self.fig.add_subplot(1, 1 +  self.len_poses, 2, projection='3d')
-        ax.view_init(elev=15., azim=azim)
-        ax.set_xlim3d([-radius / 2, radius / 2])
-        ax.set_zlim3d([0, radius])
-        ax.set_ylim3d([-radius / 2, radius / 2])
-        # ax.set_aspect('equal')
-        ax.set_xticklabels([])
-        ax.set_yticklabels([])
-        ax.set_zticklabels([])
-        ax.dist = 12.5
-        ax.set_title('Reconstruction')  # , pad=35
-        self.ax_3d.append(ax)
 
 
 
@@ -86,7 +67,7 @@ class Sequencial_animation():
         return np.mean(X[:length].reshape(-1, factor, *X.shape[1:]), axis=1)
 
 
-    def render_animation(self,keypoints, poses, skeleton, fps, bitrate, output, viewport,
+    def render_animation(self,keypoints, poses, skeleton, fps, bitrate, azim, output, viewport,
                         limit=-1, downsample=1, input_video_path=None, input_video_skip=0):
         """
         TODO
@@ -97,13 +78,30 @@ class Sequencial_animation():
         -- 'filename.mp4': render and export the animation as an h264 video (requires ffmpeg).
         -- 'filename.gif': render and export the animation a gif file (requires imagemagick).
         """
-        # for index, (title, data) in enumerate(poses.items()):
-        # (_,data) = poses.items()
-        data=poses
+
+        # prevent wired error
+        _ = Axes3D.__class__.__name__
+
+        ax_3d = []
         lines_3d = [[]]
         trajectories = []
+        radius = 1.7
+        for index, (title, data) in enumerate(poses.items()):
+            print("a")
+            ax = self.fig.add_subplot(1, 1 +  self.len_poses, index + 2, projection='3d')
+            ax.view_init(elev=15., azim=azim)
+            ax.set_xlim3d([-radius / 2, radius / 2])
+            ax.set_zlim3d([0, radius])
+            ax.set_ylim3d([-radius / 2, radius / 2])
+            # ax.set_aspect('equal')
+            ax.set_xticklabels([])
+            ax.set_yticklabels([])
+            ax.set_zticklabels([])
+            ax.dist = 12.5
+            ax.set_title('Reconstruction')  # , pad=35
+            ax_3d.append(ax)
         trajectories.append(data[:, 0, [0, 1]])
-        # poses = list(poses.values())
+        poses = list(poses.values())
 
         # Decode video
         if input_video_path is None:
@@ -142,7 +140,7 @@ class Sequencial_animation():
         def update_video(i):
             nonlocal initialized, image, lines, points
 
-            # for n, ax in enumerate(self.ax_3d):
+            # for n, ax in enumerate(ax_3d):
                 # ax.set_xlim3d([-radius / 2 + trajectories[n][i, 0], radius / 2 + trajectories[n][i, 0]])
                 # ax.set_ylim3d([-radius / 2 + trajectories[n][i, 1], radius / 2 + trajectories[n][i, 1]])
 
@@ -160,14 +158,11 @@ class Sequencial_animation():
                     #                             [keypoints[i, j, 1], keypoints[i, j_parent, 1]], color='pink'))
 
                     col = 'red' if j in skeleton.joints_right() else 'black'
-                    for n, ax in enumerate(self.ax_3d):
+                    for n, ax in enumerate(ax_3d):
                         pos = poses[n][i]
-                        ax.plot([pos[j, 0], pos[j_parent, 0]],
+                        lines_3d[n].append(ax.plot([pos[j, 0], pos[j_parent, 0]],
                                                 [pos[j, 1], pos[j_parent, 1]],
-                                                [pos[j, 2], pos[j_parent, 2]], zdir='z', c=col)
-                        # lines_3d[n].append(ax.plot([pos[j, 0], pos[j_parent, 0]],
-                        #                         [pos[j, 1], pos[j_parent, 1]],
-                        #                         [pos[j, 2], pos[j_parent, 2]], zdir='z', c=col))
+                                                [pos[j, 2], pos[j_parent, 2]], zdir='z', c=col))
 
                 points = self.ax_in.scatter(*keypoints[i].T, 5, color='red', edgecolors='white', zorder=10)
 
@@ -183,7 +178,7 @@ class Sequencial_animation():
                     #     lines[j - 1][0].set_data([keypoints[i, j, 0], keypoints[i, j_parent, 0]],
                     #                              [keypoints[i, j, 1], keypoints[i, j_parent, 1]])
 
-                    for n, ax in enumerate(self.ax_3d):
+                    for n, ax in enumerate(ax_3d):
                         pos = poses[n][i]
                         lines_3d[n][j - 1][0].set_xdata([pos[j, 0], pos[j_parent, 0]])
                         lines_3d[n][j - 1][0].set_ydata([pos[j, 1], pos[j_parent, 1]])
