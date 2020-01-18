@@ -50,6 +50,11 @@ class Sequencial_animation():
         self.ax_3d.set_zticklabels([])
         self.ax_3d.dist = 12.5
         self.ax_3d.set_title('Reconstruction')  
+        self.initialized = False
+        self.image = None
+        self.lines_3d = [[]]
+        self.point= None
+
 
     def ckpt_time(self,ckpt=None, display=0, desc=''):
         if not ckpt:
@@ -96,7 +101,6 @@ class Sequencial_animation():
         """
 
 
-        lines_3d = [[]]
         trajectories = []
         # for index, (title, data) in enumerate(poses.items()):
         data = poses['Reconstruction']
@@ -124,10 +128,7 @@ class Sequencial_animation():
                 trajectories[idx] = self.downsample_tensor(trajectories[idx], downsample)
             fps /= downsample
 
-        initialized = False
-        image = None
         lines = []
-        points = None
 
         if limit < 1:
             limit = len(all_frames)
@@ -138,13 +139,13 @@ class Sequencial_animation():
         # pbar = tqdm(total=limit)
 
         def update_video(i):
-            self.ax_in.clear()
-            self.ax_3d.clear()
-            nonlocal initialized, image, lines, points
+            # self.ax_in.clear()
+            # self.ax_3d.clear()
+            nonlocal lines
 
             # Update 2D poses
-            if not initialized:
-                image = self.ax_in.imshow(all_frames[i], aspect='equal')
+            if not self.initialized:
+                self.image = self.ax_in.imshow(all_frames[i], aspect='equal')
 
                 for j, j_parent in enumerate(parents):
                     if j_parent == -1:
@@ -153,28 +154,31 @@ class Sequencial_animation():
                     col = 'red' if j in skeleton.joints_right() else 'black'
                     n=0
                     pos = poses[n][i]
-                    lines_3d[n].append(self.ax_3d.plot([pos[j, 0], pos[j_parent, 0]],
+                    self.lines_3d[n].append(self.ax_3d.plot([pos[j, 0], pos[j_parent, 0]],
                                             [pos[j, 1], pos[j_parent, 1]],
                                             [pos[j, 2], pos[j_parent, 2]], zdir='z', c=col))
+                    
                                 
 
-                points = self.ax_in.scatter(*keypoints[i].T, 5, color='red', edgecolors='white', zorder=10)
+                self.point= self.ax_in.scatter(*keypoints[i].T, 5, color='red', edgecolors='white', zorder=10)
 
-                initialized = True
+                self.initialized = True
             else:
+                self.image = self.ax_in.imshow(all_frames[i], aspect='equal')
+
                 print("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
-                image.set_data(all_frames[i])
+                self.image.set_data(all_frames[i])
 
                 for j, j_parent in enumerate(parents):
                     if j_parent == -1:
                         continue
                     n=0
                     pos = poses[n][i]
-                    lines_3d[n][j - 1][0].set_xdata([pos[j, 0], pos[j_parent, 0]])
-                    lines_3d[n][j - 1][0].set_ydata([pos[j, 1], pos[j_parent, 1]])
-                    lines_3d[n][j - 1][0].set_3d_properties([pos[j, 2], pos[j_parent, 2]], zdir='z')
+                    self.lines_3d[n][j - 1][0].set_xdata([pos[j, 0], pos[j_parent, 0]])
+                    self.lines_3d[n][j - 1][0].set_ydata([pos[j, 1], pos[j_parent, 1]])
+                    self.lines_3d[n][j - 1][0].set_3d_properties([pos[j, 2], pos[j_parent, 2]], zdir='z')
 
-                points.set_offsets(keypoints[i])
+                self.point.set_offsets(keypoints[i])
 
 
 
