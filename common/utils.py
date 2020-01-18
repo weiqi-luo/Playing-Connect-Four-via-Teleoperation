@@ -191,11 +191,6 @@ def evaluate(seq_2d, pad, model_pos, action=None, return_predictions=False):
             inputs_2d = inputs_2d.cuda()
         # Positional model
         predicted_3d_pos = model_pos(inputs_2d)
-        # if test_generator.augment_enabled(): #* false
-        #     # Undo flipping and take average with non-flipped version
-        #     predicted_3d_pos[1, :, :, 0] *= -1
-        #     predicted_3d_pos[1, :, joints_left + joints_right] = predicted_3d_pos[1, :, joints_right + joints_left]
-        #     predicted_3d_pos = torch.mean(predicted_3d_pos, dim=0, keepdim=True)
         if return_predictions: #* true
             return predicted_3d_pos.squeeze(0).cpu().numpy()
 

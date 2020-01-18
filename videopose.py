@@ -7,7 +7,8 @@ from common.generators import UnchunkedGenerator
 from common.loss import *
 from common.model import *
 from common.utils import Timer, evaluate, add_path
-
+from collections import deque
+import cv2
 # from joints_detectors.openpose.main import generate_kpts as open_pose
 
 
@@ -59,83 +60,102 @@ class Skeleton:
 
 
 def main(args):
+    # read image from camera
+    cap = cv2.VideoCapture(0)
+    kp_deque = deque(maxlen=9)
+    
+    # if(True):
+        # ret, frame = cap.read()
+        # cv2.imshow('frame',frame)
+        # if cv2.waitKey(1) & 0xFF == ord('q'):
+        #     break
+
     detector_2d = get_detector_2d(args.detector_2d)
 
     assert detector_2d, 'detector_2d should be in ({alpha, hr, open}_pose)'
 
     #! 2D kpts loads or generate
-    if not args.input_npz:
-        video_name = args.viz_video
-        keypoints = detector_2d(video_name)
-    else:
-        npz = np.load(args.input_npz)
-        keypoints = npz['kpts']  # (N, 17, 2)
+    # if not args.input_npz:
+    #     video_name = args.viz_video
+    #     keypoints = detector_2d(video_name)
+    # else:
+    npz = np.load("./outputs/alpha_pose_kunkun_short/kunkun_short.npz")
+    count = 0
+    keypoints = npz['kpts']  # (N, 17, 2)
+    for kp in keypoints:
+        print(count)
+        kp_deque.append(kp)
+        if len(kp_deque)<9:
+            continue
+        keypoints_symmetry = metadata['keypoints_symmetry']
+        kps_left, kps_right = list(keypoints_symmetry[0]), list(keypoints_symmetry[1])
+        joints_left, joints_right = list([4, 5, 6, 11, 12, 13]), list([1, 2, 3, 14, 15, 16])
+        
+        #! normlization keypoints  Suppose using the camera parameter
+        input_keypoints = normalize_screen_coordinates(np.asarray(kp_deque)[..., :2], w=1000, h=1002)
 
-    keypoints_symmetry = metadata['keypoints_symmetry']
-    kps_left, kps_right = list(keypoints_symmetry[0]), list(keypoints_symmetry[1])
-    joints_left, joints_right = list([4, 5, 6, 11, 12, 13]), list([1, 2, 3, 14, 15, 16])
+        model_pos = TemporalModel(17, 2, 17, filter_widths=[3, 3, 3, 3, 3], causal=args.causal, dropout=args.dropout, channels=args.channels,
+                                dense=args.dense)
 
-    #! normlization keypoints  Suppose using the camera parameter
-    keypoints = normalize_screen_coordinates(keypoints[..., :2], w=1000, h=1002)
+        if torch.cuda.is_available():
+            model_pos = model_pos.cuda()
 
-    model_pos = TemporalModel(17, 2, 17, filter_widths=[3, 3, 3, 3, 3], causal=args.causal, dropout=args.dropout, channels=args.channels,
-                              dense=args.dense)
+        ckpt, time1 = ckpt_time(time0)
+        print('-------------- load data spends {:.2f} seconds'.format(ckpt))
 
-    if torch.cuda.is_available():
-        model_pos = model_pos.cuda()
+        #! load trained model
+        chk_filename = os.path.join(args.checkpoint, args.resume if args.resume else args.evaluate)
+        print('Loading checkpoint', chk_filename)
+        checkpoint = torch.load(chk_filename, map_location=lambda storage, loc: storage)  # 把loc映射到storage
+        model_pos.load_state_dict(checkpoint['model_pos'])
 
-    ckpt, time1 = ckpt_time(time0)
-    print('-------------- load data spends {:.2f} seconds'.format(ckpt))
+        ckpt, time2 = ckpt_time(time1)
+        print('-------------- load 3D model spends {:.2f} seconds'.format(ckpt))
 
-    #! load trained model
-    chk_filename = os.path.join(args.checkpoint, args.resume if args.resume else args.evaluate)
-    print('Loading checkpoint', chk_filename)
-    checkpoint = torch.load(chk_filename, map_location=lambda storage, loc: storage)  # 把loc映射到storage
-    model_pos.load_state_dict(checkpoint['model_pos'])
+        #  Receptive field: 243 frames for args.arc [3, 3, 3, 3, 3]
+        receptive_field = model_pos.receptive_field()
+        pad = (receptive_field - 1) // 2  # Padding on each side
+        causal_shift = 0
 
-    ckpt, time2 = ckpt_time(time1)
-    print('-------------- load 3D model spends {:.2f} seconds'.format(ckpt))
+        print('Rendering...')
+        gen = UnchunkedGenerator(None, None, [input_keypoints],
+                                pad=pad, causal_shift=causal_shift, augment=args.test_time_augmentation,
+                                kps_left=kps_left, kps_right=kps_right, joints_left=joints_left, joints_right=joints_right)
+        prediction = evaluate(input_keypoints, pad, model_pos, return_predictions=True)
 
-    #  Receptive field: 243 frames for args.arc [3, 3, 3, 3, 3]
-    receptive_field = model_pos.receptive_field()
-    pad = (receptive_field - 1) // 2  # Padding on each side
-    causal_shift = 0
+        # save 3D joint points
+        np.save('outputs/test_3d_output.npy', prediction, allow_pickle=True)
 
-    print('Rendering...')
-    input_keypoints = keypoints.copy()
-    gen = UnchunkedGenerator(None, None, [input_keypoints],
-                             pad=pad, causal_shift=causal_shift, augment=args.test_time_augmentation,
-                             kps_left=kps_left, kps_right=kps_right, joints_left=joints_left, joints_right=joints_right)
-    prediction = evaluate(input_keypoints, pad, model_pos, return_predictions=True)
+        rot = np.array([0.14070565, -0.15007018, -0.7552408, 0.62232804], dtype=np.float32)
+        prediction = camera_to_world(prediction, R=rot, t=0)
 
-    # save 3D joint points
-    np.save('outputs/test_3d_output.npy', prediction, allow_pickle=True)
+        # We don't have the trajectory, but at least we can rebase the height
+        prediction[:, :, 2] -= np.min(prediction[:, :, 2])
+        print(prediction.shape)
+        anim_output = {'Reconstruction': prediction}
+        input_keypoints = image_coordinates(input_keypoints[..., :2], w=1000, h=1002)
 
-    rot = np.array([0.14070565, -0.15007018, -0.7552408, 0.62232804], dtype=np.float32)
-    prediction = camera_to_world(prediction, R=rot, t=0)
+        ckpt, time3 = ckpt_time(time2)
+        print('-------------- generate reconstruction 3D data spends {:.2f} seconds'.format(ckpt))
 
-    # We don't have the trajectory, but at least we can rebase the height
-    prediction[:, :, 2] -= np.min(prediction[:, :, 2])
-    print(prediction.shape)
-    anim_output = {'Reconstruction': prediction}
-    input_keypoints = image_coordinates(input_keypoints[..., :2], w=1000, h=1002)
+        #! Visualization
+        if not args.viz_output:
+            args.viz_output = 'outputs/alpha_result.mp4'
 
-    ckpt, time3 = ckpt_time(time2)
-    print('-------------- generate reconstruction 3D data spends {:.2f} seconds'.format(ckpt))
+        from common.visualization import render_animation
+        render_animation(input_keypoints, anim_output,
+                        Skeleton(), 25, args.viz_bitrate, np.array(70., dtype=np.float32), args.viz_output,
+                        limit=args.viz_limit, downsample=args.viz_downsample, size=args.viz_size,
+                        input_video_path=args.viz_video, viewport=(1000, 1002),
+                        input_video_skip=count)
 
-    #! Visualization
-    if not args.viz_output:
-        args.viz_output = 'outputs/alpha_result.mp4'
+        ckpt, time4 = ckpt_time(time3)
+        print('total spend {:2f} second'.format(ckpt))
+        count += 1
 
-    from common.visualization import render_animation
-    render_animation(input_keypoints, anim_output,
-                     Skeleton(), 25, args.viz_bitrate, np.array(70., dtype=np.float32), args.viz_output,
-                     limit=args.viz_limit, downsample=args.viz_downsample, size=args.viz_size,
-                     input_video_path=args.viz_video, viewport=(1000, 1002),
-                     input_video_skip=args.viz_skip)
 
-    ckpt, time4 = ckpt_time(time3)
-    print('total spend {:2f} second'.format(ckpt))
+    cap.release()
+    cv2.destroyAllWindows()
 
 
 def inference_video(video_path, detector_2d):
@@ -164,4 +184,4 @@ def inference_video(video_path, detector_2d):
 
 
 if __name__ == '__main__':
-    inference_video('outputs/dancing_Trim.mp4', 'alpha_pose')
+    inference_video('outputs/kunkun_short.mp4', 'alpha_pose')

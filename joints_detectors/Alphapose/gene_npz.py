@@ -34,6 +34,7 @@ def image_interface(model, image):
 
 def generate_kpts(video_file):
     final_result, video_name = handle_video(video_file)
+    print(len(final_result), video_name)
 
     # ============ Changing ++++++++++
 
@@ -186,7 +187,7 @@ def handle_video(video_file):
     writer.stop()
     final_result = writer.results()
     write_json(final_result, args.outputpath)
-
+    print("final result:", len(final_result), final_result[0]) 
     return final_result, video_name
 
 

@@ -19,6 +19,7 @@ from common.utils import read_video
 import matplotlib
 matplotlib.use( 'tkagg' )
 
+
 def ckpt_time(ckpt=None, display=0, desc=''):
     if not ckpt:
         return time.time()
