@@ -114,6 +114,7 @@ def main(args):
         kp_deque.append(kp)
         if len(kp_deque)<9:
             continue
+        
         keypoints_symmetry = metadata['keypoints_symmetry']
         kps_left, kps_right = list(keypoints_symmetry[0]), list(keypoints_symmetry[1])
         joints_left, joints_right = list([4, 5, 6, 11, 12, 13]), list([1, 2, 3, 14, 15, 16])
@@ -151,23 +152,19 @@ def main(args):
         prediction = evaluate(input_keypoints, pad, model_pos, return_predictions=True)
 
         # save 3D joint points
-        np.save('outputs/test_3d_output.npy', prediction, allow_pickle=True)
+        # np.save('outputs/test_3d_output.npy', prediction, allow_pickle=True)
 
-        rot = np.array([0.14070565, -0.15007018, -0.7552408, 0.62232804], dtype=np.float32)
-        prediction = camera_to_world(prediction, R=rot, t=0)
+        # rot = np.array([0.14070565, -0.15007018, -0.7552408, 0.62232804], dtype=np.float32)
+        # prediction = camera_to_world(prediction, R=rot, t=0)
 
         # We don't have the trajectory, but at least we can rebase the height
         prediction[:, :, 2] -= np.min(prediction[:, :, 2])
-        anim_output = {'Reconstruction': prediction}
         input_keypoints = image_coordinates(input_keypoints[..., :2], w=1000, h=1002)
 
         ckpt, time3 = ckpt_time(time2)
         print('-------------- generate reconstruction 3D data spends {:.2f} seconds'.format(ckpt))
 
         #! Visualization
-        if not args.viz_output:
-            args.viz_output = 'outputs/alpha_result.mp4'
-
         sequencial_animation.call(input_keypoints, prediction, all_frames[count])   # TODO
 
         ckpt, time4 = ckpt_time(time3)
