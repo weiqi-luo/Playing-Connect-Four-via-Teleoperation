@@ -83,7 +83,7 @@ def main(args):
     count = 0
     keypoints = npz['kpts']  # (N, 17, 2)
     from common.visualization import Sequencial_animation
-    sequencial_animation = Sequencial_animation(size=args.viz_size, azim=np.array(70., dtype=np.float32))
+    sequencial_animation = Sequencial_animation(size=args.viz_size, azim=np.array(70., dtype=np.float32), 25)
     for kp in keypoints:
         kp_deque.append(kp)
         if len(kp_deque)<9:
@@ -143,7 +143,7 @@ def main(args):
             args.viz_output = 'outputs/alpha_result.mp4'
 
         sequencial_animation.call(input_keypoints, prediction,
-                        Skeleton(), 25, args.viz_bitrate, args.viz_output,
+                        Skeleton(), args.viz_bitrate, args.viz_output,
                         limit=args.viz_limit, downsample=args.viz_downsample, 
                         input_video_path=args.viz_video, viewport=(1000, 1002),
                         input_video_skip=count)
