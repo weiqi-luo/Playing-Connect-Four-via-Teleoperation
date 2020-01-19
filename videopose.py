@@ -105,7 +105,7 @@ def main(args):
     all_frames = decode_video(downsample=args.viz_downsample, input_video_path=args.viz_video)
 
     from common.visualization import Sequencial_animation
-    sequencial_animation = Sequencial_animation(
+    sequencial_animation = Sequencial_animation( skeleton=Skeleton(), i=8,
         size=args.viz_size, azim=np.array(70., dtype=np.float32), limit=args.viz_limit, fps=25) #todo
 
     for kp in keypoints:
@@ -168,9 +168,7 @@ def main(args):
         if not args.viz_output:
             args.viz_output = 'outputs/alpha_result.mp4'
 
-        sequencial_animation.call(input_keypoints, prediction, all_frames[count],
-                        Skeleton(), args.viz_bitrate, args.viz_output,
-                        viewport=(1000, 1002))   # TODO
+        sequencial_animation.call(input_keypoints, prediction, all_frames[count])   # TODO
 
         ckpt, time4 = ckpt_time(time3)
         print('total spend {:2f} second'.format(ckpt))

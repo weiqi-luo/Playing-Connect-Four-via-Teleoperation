@@ -19,7 +19,7 @@ import matplotlib
 matplotlib.use( 'tkagg' )
 
 class Sequencial_animation():
-    def __init__(self,azim,fps, size=6, limit=-1,downsample=1):
+    def __init__(self,skeleton, azim,fps, size=6, limit=-1,downsample=1,i=8):
         plt.ion()   # continuously plot
         # plt.ioff()
         self.len_poses=1
@@ -51,11 +51,14 @@ class Sequencial_animation():
         self.ax_3d.set_title('Reconstruction')  
         self.initialized = False
         self.image = None
-        self.lines_3d = [[]]
+        self.lines_3d = []
         self.point= None
 
         self.downsample = downsample
+        self.parents = skeleton.parents()
+        self.joints_right = skeleton.joints_right()
         
+        self.i = i
 
     def ckpt_time(self,ckpt=None, display=0, desc=''):
         if not ckpt:
@@ -89,49 +92,40 @@ class Sequencial_animation():
         return np.mean(X[:length].reshape(-1, factor, *X.shape[1:]), axis=1)
 
 
-    def init_video(self, i, keypoints, data, current_frame, skeleton): #TODO
+    def call(self,keypoints, data, current_frame): #TODO
 
         # if self.downsample > 1:
         #     all_frames = self.downsample_tensor(np.array(current_frame), self.downsample).astype('uint8')
         #     keypoints = self.downsample_tensor(keypoints, self.downsample)
         #     data = self.downsample_tensor(data, self.downsample)
 
-        parents = skeleton.parents()
-        self.image = self.ax_in.imshow(current_frame, aspect='equal')
-        for j, j_parent in enumerate(parents):
-            if j_parent == -1:
-                continue
-            col = 'red' if j in skeleton.joints_right() else 'black'
-            n=0
-            pos = data[i]
-            self.lines_3d[n].append(self.ax_3d.plot([pos[j, 0], pos[j_parent, 0]],
-                                    [pos[j, 1], pos[j_parent, 1]],
-                                    [pos[j, 2], pos[j_parent, 2]], zdir='z', c=col))              
-        self.point= self.ax_in.scatter(*keypoints[i].T, 5, color='red', edgecolors='white', zorder=10)
+        # Update 2D poses
+        if not self.initialized:
+            self.image = self.ax_in.imshow(current_frame, aspect='equal')
+            self.point= self.ax_in.scatter(*keypoints[self.i].T, 5, color='red', edgecolors='white', zorder=10)
+            for j, j_parent in enumerate(self.parents):
+                if j_parent == -1:
+                    continue
+                col = 'red' if j in self.joints_right else 'black'
+                pos = data[self.i]
+                self.lines_3d.append(self.ax_3d.plot([pos[j, 0], pos[j_parent, 0]],
+                                        [pos[j, 1], pos[j_parent, 1]],
+                                        [pos[j, 2], pos[j_parent, 2]], zdir='z', c=col))
+            self.initialized = True
+        
+        else:
+            self.image = self.ax_in.imshow(current_frame, aspect='equal')
+            self.image.set_data(current_frame)
+            self.point.set_offsets(keypoints[self.i])
+            for j, j_parent in enumerate(self.parents):
+                if j_parent == -1:
+                    continue
+                pos = data[self.i]
+                self.lines_3d[j - 1][0].set_xdata([pos[j, 0], pos[j_parent, 0]])
+                self.lines_3d[j - 1][0].set_ydata([pos[j, 1], pos[j_parent, 1]])
+                self.lines_3d[j - 1][0].set_3d_properties([pos[j, 2], pos[j_parent, 2]], zdir='z')
 
         # anim = FuncAnimation(self.fig, update_video, frames=limit, interval=1000.0 / self.fps, repeat=False)
         plt.draw()
-        plt.pause(0.0000001)
-
-    def update_video(self, i, keypoints, data, current_frame, skeleton):
-        parents = skeleton.parents()
-
-        # Update 2D poses
-        self.image = self.ax_in.imshow(current_frame, aspect='equal')
-        self.image.set_data(current_frame)
-
-        for j, j_parent in enumerate(parents):
-            if j_parent == -1:
-                continue
-            n=0
-            pos = data[i]
-            self.lines_3d[n][j - 1][0].set_xdata([pos[j, 0], pos[j_parent, 0]])
-            self.lines_3d[n][j - 1][0].set_ydata([pos[j, 1], pos[j_parent, 1]])
-            self.lines_3d[n][j - 1][0].set_3d_properties([pos[j, 2], pos[j_parent, 2]], zdir='z')
-
-        self.point.set_offsets(keypoints[i])
-
-        plt.draw()
-        plt.pause(0.0000001)
-
+        plt.pause(0.000000000000000001)
 
