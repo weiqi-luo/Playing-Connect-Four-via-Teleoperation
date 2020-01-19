@@ -9,6 +9,8 @@ from common.model import *
 from common.utils import Timer, evaluate, add_path
 from collections import deque
 import cv2
+from common.utils import read_video
+
 # from joints_detectors.openpose.main import generate_kpts as open_pose
 
 
@@ -45,10 +47,27 @@ def get_detector_2d(detector_name):
         'hr_pose': get_hr_pose,
         # 'open_pose': open_pose
     }
-
     assert detector_name in detector_map, f'2D detector: {detector_name} not implemented yet!'
-
     return detector_map[detector_name]()
+
+
+def decode_video(downsample=1,input_video_path=None,input_video_skip=0,limit=0):
+    # Decode video
+    if input_video_path is None:
+        # Black background
+        all_frames = np.zeros((keypoints.shape[0], viewport[1], viewport[0]), dtype='uint8')
+    else:
+        # Load video using ffmpeg
+        all_frames = []
+        for f in read_video(input_video_path, fps=None, skip=input_video_skip):
+            all_frames.append(f)
+        # effective_length = min(keypoints.shape[0], len(all_frames))
+        # all_frames = all_frames[:effective_length]
+    if limit < 1:
+        limit = len(all_frames)
+    else:
+        limit = min(limit, len(all_frames))
+    return all_frames
 
 
 class Skeleton:
@@ -80,11 +99,18 @@ def main(args):
     #     keypoints = detector_2d(video_name)
     # else:
     npz = np.load("./outputs/alpha_pose_kunkun_short/kunkun_short.npz")
-    count = 0
+    count = -1
     keypoints = npz['kpts']  # (N, 17, 2)
+
+    all_frames = decode_video(downsample=args.viz_downsample, input_video_path=args.viz_video)
+
     from common.visualization import Sequencial_animation
-    sequencial_animation = Sequencial_animation(size=args.viz_size, azim=np.array(70., dtype=np.float32), 25)
+    sequencial_animation = Sequencial_animation(
+        size=args.viz_size, azim=np.array(70., dtype=np.float32), limit=args.viz_limit, fps=25) #todo
+
     for kp in keypoints:
+        count += 1
+
         kp_deque.append(kp)
         if len(kp_deque)<9:
             continue
@@ -142,15 +168,12 @@ def main(args):
         if not args.viz_output:
             args.viz_output = 'outputs/alpha_result.mp4'
 
-        sequencial_animation.call(input_keypoints, prediction,
+        sequencial_animation.call(input_keypoints, prediction, all_frames[count],
                         Skeleton(), args.viz_bitrate, args.viz_output,
-                        limit=args.viz_limit, downsample=args.viz_downsample, 
-                        input_video_path=args.viz_video, viewport=(1000, 1002),
-                        input_video_skip=count)
+                        viewport=(1000, 1002))   # TODO
 
         ckpt, time4 = ckpt_time(time3)
         print('total spend {:2f} second'.format(ckpt))
-        count += 1
 
 
     cap.release()

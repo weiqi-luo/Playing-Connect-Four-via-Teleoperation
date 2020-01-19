@@ -15,12 +15,11 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from mpl_toolkits.mplot3d import Axes3D
 from tqdm import tqdm
 import sys
-from common.utils import read_video
 import matplotlib
 matplotlib.use( 'tkagg' )
 
 class Sequencial_animation():
-    def __init__(self,azim,size=6):
+    def __init__(self,azim,fps, size=6, limit=-1,downsample=1):
         plt.ion()   # continuously plot
         # plt.ioff()
         self.len_poses=1
@@ -55,8 +54,10 @@ class Sequencial_animation():
         self.lines_3d = [[]]
         self.point= None
 
+        self.downsample = downsample
+        
 
-    def ckpt_time(self,ckpt=None, display=0, desc='', fps):
+    def ckpt_time(self,ckpt=None, display=0, desc=''):
         if not ckpt:
             return time.time()
         else:
@@ -88,77 +89,49 @@ class Sequencial_animation():
         return np.mean(X[:length].reshape(-1, factor, *X.shape[1:]), axis=1)
 
 
-    def call(self,keypoints, data, skeleton, bitrate, output, viewport,
-                        limit=-1, downsample=1, input_video_path=None, input_video_skip=0):
+    def init_video(self, i, keypoints, data, current_frame, skeleton): #TODO
 
-        # Decode video
-        if input_video_path is None:
-            # Black background
-            all_frames = np.zeros((keypoints.shape[0], viewport[1], viewport[0]), dtype='uint8')
-        else:
-            # Load video using ffmpeg
-            all_frames = []
-            for f in read_video(input_video_path, fps=None, skip=input_video_skip):
-                all_frames.append(f)
-
-            effective_length = min(keypoints.shape[0], len(all_frames))
-            all_frames = all_frames[:effective_length]
-
-        if downsample > 1:
-            keypoints = self.downsample_tensor(keypoints, downsample)
-            all_frames = self.downsample_tensor(np.array(all_frames), downsample).astype('uint8')
-            data = self.downsample_tensor(data, downsample)
-            fps /= downsample
-
-        if limit < 1:
-            limit = len(all_frames)
-        else:
-            limit = min(limit, len(all_frames))
+        # if self.downsample > 1:
+        #     all_frames = self.downsample_tensor(np.array(current_frame), self.downsample).astype('uint8')
+        #     keypoints = self.downsample_tensor(keypoints, self.downsample)
+        #     data = self.downsample_tensor(data, self.downsample)
 
         parents = skeleton.parents()
-        # pbar = tqdm(total=limit)
+        self.image = self.ax_in.imshow(current_frame, aspect='equal')
+        for j, j_parent in enumerate(parents):
+            if j_parent == -1:
+                continue
+            col = 'red' if j in skeleton.joints_right() else 'black'
+            n=0
+            pos = data[i]
+            self.lines_3d[n].append(self.ax_3d.plot([pos[j, 0], pos[j_parent, 0]],
+                                    [pos[j, 1], pos[j_parent, 1]],
+                                    [pos[j, 2], pos[j_parent, 2]], zdir='z', c=col))              
+        self.point= self.ax_in.scatter(*keypoints[i].T, 5, color='red', edgecolors='white', zorder=10)
 
-        def update_video(i):
-
-            # Update 2D poses
-            if not self.initialized:
-                self.image = self.ax_in.imshow(all_frames[i], aspect='equal')
-
-                for j, j_parent in enumerate(parents):
-                    if j_parent == -1:
-                        continue
-
-                    col = 'red' if j in skeleton.joints_right() else 'black'
-                    n=0
-                    pos = data[i]
-                    self.lines_3d[n].append(self.ax_3d.plot([pos[j, 0], pos[j_parent, 0]],
-                                            [pos[j, 1], pos[j_parent, 1]],
-                                            [pos[j, 2], pos[j_parent, 2]], zdir='z', c=col))
-                    
-                                
-
-                self.point= self.ax_in.scatter(*keypoints[i].T, 5, color='red', edgecolors='white', zorder=10)
-
-                self.initialized = True
-            else:
-                self.image = self.ax_in.imshow(all_frames[i], aspect='equal')
-                self.image.set_data(all_frames[i])
-
-                for j, j_parent in enumerate(parents):
-                    if j_parent == -1:
-                        continue
-                    n=0
-                    pos = data[i]
-                    self.lines_3d[n][j - 1][0].set_xdata([pos[j, 0], pos[j_parent, 0]])
-                    self.lines_3d[n][j - 1][0].set_ydata([pos[j, 1], pos[j_parent, 1]])
-                    self.lines_3d[n][j - 1][0].set_3d_properties([pos[j, 2], pos[j_parent, 2]], zdir='z')
-
-                self.point.set_offsets(keypoints[i])
-
-
-
-        # anim = FuncAnimation(self.fig, update_video, frames=limit, interval=1000.0 / fps, repeat=False)
-        update_video(8)
+        # anim = FuncAnimation(self.fig, update_video, frames=limit, interval=1000.0 / self.fps, repeat=False)
         plt.draw()
         plt.pause(0.0000001)
+
+    def update_video(self, i, keypoints, data, current_frame, skeleton):
+        parents = skeleton.parents()
+
+        # Update 2D poses
+        self.image = self.ax_in.imshow(current_frame, aspect='equal')
+        self.image.set_data(current_frame)
+
+        for j, j_parent in enumerate(parents):
+            if j_parent == -1:
+                continue
+            n=0
+            pos = data[i]
+            self.lines_3d[n][j - 1][0].set_xdata([pos[j, 0], pos[j_parent, 0]])
+            self.lines_3d[n][j - 1][0].set_ydata([pos[j, 1], pos[j_parent, 1]])
+            self.lines_3d[n][j - 1][0].set_3d_properties([pos[j, 2], pos[j_parent, 2]], zdir='z')
+
+        self.point.set_offsets(keypoints[i])
+
+        plt.draw()
+        plt.pause(0.0000001)
+
 
