@@ -79,7 +79,7 @@ class Skeleton:
 
 
 def main(args):
-    # read image from camera
+    #! read image from camera
     cap = cv2.VideoCapture(0)
     kp_deque = deque(maxlen=9)
     
@@ -88,12 +88,13 @@ def main(args):
         # cv2.imshow('frame',frame)
         # if cv2.waitKey(1) & 0xFF == ord('q'):
         #     break
-
-    detector_2d = get_detector_2d(args.detector_2d)
-
-    assert detector_2d, 'detector_2d should be in ({alpha, hr, open}_pose)'
+    
+    # fake camera
+    all_frames = decode_video(downsample=args.viz_downsample, input_video_path=args.viz_video)
 
     #! 2D kpts loads or generate
+    detector_2d = get_detector_2d(args.detector_2d)
+    assert detector_2d, 'detector_2d should be in ({alpha, hr, open}_pose)'
     # if not args.input_npz:
     #     video_name = args.viz_video
     #     keypoints = detector_2d(video_name)
@@ -102,12 +103,44 @@ def main(args):
     count = -1
     keypoints = npz['kpts']  # (N, 17, 2)
 
-    all_frames = decode_video(downsample=args.viz_downsample, input_video_path=args.viz_video)
 
+    #! visualization
     from common.visualization import Sequencial_animation
     sequencial_animation = Sequencial_animation( skeleton=Skeleton(), i=8,
         size=args.viz_size, azim=np.array(70., dtype=np.float32), limit=args.viz_limit, fps=25) #todo
 
+
+    #! Initialize some kp
+    keypoints_symmetry = metadata['keypoints_symmetry']
+    kps_left, kps_right = list(keypoints_symmetry[0]), list(keypoints_symmetry[1])
+    joints_left, joints_right = list([4, 5, 6, 11, 12, 13]), list([1, 2, 3, 14, 15, 16])
+
+
+    #! load 3d pose estimation model
+    model_pos = TemporalModel(17, 2, 17, filter_widths=[3, 3, 3, 3, 3], causal=args.causal, dropout=args.dropout, channels=args.channels,
+                            dense=args.dense)
+    if torch.cuda.is_available():
+        model_pos = model_pos.cuda()
+
+    ckpt, time1 = ckpt_time(time0)
+    print('-------------- load 3d pose estimaion model spends {:.2f} seconds'.format(ckpt))
+
+
+    #! load trained weights
+    chk_filename = os.path.join(args.checkpoint, args.resume if args.resume else args.evaluate)
+    print('Loading checkpoint', chk_filename)
+    checkpoint = torch.load(chk_filename, map_location=lambda storage, loc: storage)  # 把loc映射到storage
+    model_pos.load_state_dict(checkpoint['model_pos'])
+    #  Receptive field: 243 frames for args.arc [3, 3, 3, 3, 3]
+    receptive_field = model_pos.receptive_field()
+    pad = (receptive_field - 1) // 2  # Padding on each side
+    causal_shift = 0
+
+    ckpt, time2 = ckpt_time(time1)
+    print('-------------- load trained weights for 3D model spends {:.2f} seconds'.format(ckpt))
+
+
+    #! loop through the frame (now fake frame)
     for kp in keypoints:
         count += 1
 
@@ -115,62 +148,30 @@ def main(args):
         if len(kp_deque)<9:
             continue
         
-        keypoints_symmetry = metadata['keypoints_symmetry']
-        kps_left, kps_right = list(keypoints_symmetry[0]), list(keypoints_symmetry[1])
-        joints_left, joints_right = list([4, 5, 6, 11, 12, 13]), list([1, 2, 3, 14, 15, 16])
-        
-        #! normlization keypoints  Suppose using the camera parameter
+        #! estimate 3d pose 
+        # normlization keypoints  Suppose using the camera parameter
         input_keypoints = normalize_screen_coordinates(np.asarray(kp_deque)[..., :2], w=1000, h=1002)
-
-        model_pos = TemporalModel(17, 2, 17, filter_widths=[3, 3, 3, 3, 3], causal=args.causal, dropout=args.dropout, channels=args.channels,
-                                dense=args.dense)
-
-        if torch.cuda.is_available():
-            model_pos = model_pos.cuda()
-
-        ckpt, time1 = ckpt_time(time0)
-        print('-------------- load data spends {:.2f} seconds'.format(ckpt))
-
-        #! load trained model
-        chk_filename = os.path.join(args.checkpoint, args.resume if args.resume else args.evaluate)
-        print('Loading checkpoint', chk_filename)
-        checkpoint = torch.load(chk_filename, map_location=lambda storage, loc: storage)  # 把loc映射到storage
-        model_pos.load_state_dict(checkpoint['model_pos'])
-
-        ckpt, time2 = ckpt_time(time1)
-        print('-------------- load 3D model spends {:.2f} seconds'.format(ckpt))
-
-        #  Receptive field: 243 frames for args.arc [3, 3, 3, 3, 3]
-        receptive_field = model_pos.receptive_field()
-        pad = (receptive_field - 1) // 2  # Padding on each side
-        causal_shift = 0
-
-        print('Rendering...')
-        gen = UnchunkedGenerator(None, None, [input_keypoints],
-                                pad=pad, causal_shift=causal_shift, augment=args.test_time_augmentation,
-                                kps_left=kps_left, kps_right=kps_right, joints_left=joints_left, joints_right=joints_right)
         prediction = evaluate(input_keypoints, pad, model_pos, return_predictions=True)
 
         # save 3D joint points
         # np.save('outputs/test_3d_output.npy', prediction, allow_pickle=True)
 
-        # rot = np.array([0.14070565, -0.15007018, -0.7552408, 0.62232804], dtype=np.float32)
-        # prediction = camera_to_world(prediction, R=rot, t=0)
+        # rotate the camera perspective
+        rot = np.array([0.14070565, -0.15007018, -0.7552408, 0.62232804], dtype=np.float32)
+        prediction = camera_to_world(prediction, R=rot, t=0)
 
         # We don't have the trajectory, but at least we can rebase the height
         prediction[:, :, 2] -= np.min(prediction[:, :, 2])
         input_keypoints = image_coordinates(input_keypoints[..., :2], w=1000, h=1002)
 
-        ckpt, time3 = ckpt_time(time2)
-        print('-------------- generate reconstruction 3D data spends {:.2f} seconds'.format(ckpt))
+        # ckpt, time3 = ckpt_time(time2)
+        # print('-------------- generate reconstruction 3D data spends {:.2f} seconds'.format(ckpt))
 
         #! Visualization
         sequencial_animation.call(input_keypoints, prediction, all_frames[count])   # TODO
 
-        ckpt, time4 = ckpt_time(time3)
-        print('total spend {:2f} second'.format(ckpt))
-
-
+    pos_list = sequencial_animation.get_pos_list()
+    np.save("outputs/3dpose.npy",pos_list)
     cap.release()
     cv2.destroyAllWindows()
 

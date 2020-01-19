@@ -52,6 +52,7 @@ class Sequencial_animation():
         self.initialized = False
         self.image = None
         self.lines_3d = []
+        self.pos_list = []
         self.point= None
 
         self.downsample = downsample
@@ -67,6 +68,10 @@ class Sequencial_animation():
             if display:
                 print(desc + ' consume time {:0.4f}'.format(time.time() - float(ckpt)))
             return time.time() - float(ckpt), time.time()
+
+
+    def get_pos_list(self):
+        return self.pos_list
 
 
     def set_equal_aspect(self,ax, data):
@@ -124,8 +129,8 @@ class Sequencial_animation():
                 self.lines_3d[j - 1][0].set_xdata([pos[j, 0], pos[j_parent, 0]])
                 self.lines_3d[j - 1][0].set_ydata([pos[j, 1], pos[j_parent, 1]])
                 self.lines_3d[j - 1][0].set_3d_properties([pos[j, 2], pos[j_parent, 2]], zdir='z')
-
         # anim = FuncAnimation(self.fig, update_video, frames=limit, interval=1000.0 / self.fps, repeat=False)
+        self.pos_list.append(pos)
         plt.draw()
         plt.pause(0.000000000000000001)
 

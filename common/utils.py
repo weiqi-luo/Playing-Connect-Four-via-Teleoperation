@@ -186,7 +186,6 @@ def evaluate(seq_2d, pad, model_pos, action=None, return_predictions=False):
                                             ((pad, pad), (0, 0), (0, 0)),
                                             'edge'), axis=0)
         inputs_2d = torch.from_numpy(batch_2d.astype('float32'))
-        print(batch_2d.shape)
         if torch.cuda.is_available():
             inputs_2d = inputs_2d.cuda()
         # Positional model
