@@ -20,7 +20,6 @@ matplotlib.use( 'tkagg' )
 
 class Sequencial_animation():
     def __init__(self,skeleton, azim,fps, size=6, limit=-1,downsample=1,i=8):
-        plt.ion()   # continuously plot
         # plt.ioff()
         self.len_poses=1
         # self.fig = plt.figure(figsize=(size * (1 +  self.len_poses), size))
@@ -133,4 +132,3 @@ class Sequencial_animation():
         self.pos_list.append(pos)
         plt.draw()
         plt.pause(0.000000000000000001)
-

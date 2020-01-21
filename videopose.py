@@ -10,6 +10,8 @@ from common.utils import Timer, evaluate, add_path
 from collections import deque
 import cv2
 from common.utils import read_video
+import matplotlib.pyplot as plt
+
 
 # from joints_detectors.openpose.main import generate_kpts as open_pose
 
@@ -108,6 +110,7 @@ def main(args):
     from common.visualization import Sequencial_animation
     sequencial_animation = Sequencial_animation( skeleton=Skeleton(), i=8,
         size=args.viz_size, azim=np.array(70., dtype=np.float32), limit=args.viz_limit, fps=25) #todo
+    plt.ion()   # continuously plot #TODO
 
 
     #! Initialize some kp
@@ -142,7 +145,7 @@ def main(args):
 
     #! loop through the frame (now fake frame)
     for kp in keypoints:
-        count += 1
+        count+=1
 
         kp_deque.append(kp)
         if len(kp_deque)<9:
@@ -169,12 +172,17 @@ def main(args):
 
         #! Visualization
         sequencial_animation.call(input_keypoints, prediction, all_frames[count])   # TODO
+        time.sleep(3)
+        print("frame ",count)
+        # plt.show()  #TODO
 
     pos_list = sequencial_animation.get_pos_list()
     np.save("outputs/3dpose.npy",pos_list)
+    plt.ioff()
+    plt.show()
     cap.release()
     cv2.destroyAllWindows()
-
+    
 
 def inference_video(video_path, detector_2d):
     """
@@ -194,6 +202,7 @@ def inference_video(video_path, detector_2d):
     args.viz_output = f'{dir_name}/{args.detector_2d}_{video_name}.mp4'
     # args.viz_limit = 20
     # args.input_npz = 'outputs/alpha_pose_dance/dance.npz'
+    
 
     args.evaluate = 'pretrained_h36m_detectron_coco.bin'
 
