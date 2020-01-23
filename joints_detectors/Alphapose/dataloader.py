@@ -23,7 +23,7 @@ from pPose_nms import pose_nms
 from yolo.darknet import Darknet
 from yolo.preprocess import prep_image, prep_frame
 from yolo.util import dynamic_write_results
-
+from matplotlib import pyplot as plt
 # import the Queue class from Python 3
 if sys.version_info >= (3, 0):
     from queue import Queue, LifoQueue
@@ -736,6 +736,21 @@ class DataGenerator:
 
         self.window = "2d-pose"
 
+        ###############################################################################
+        size = 6
+        self.fig_in = plt.figure(figsize=(size , size))
+        self.ax_in = self.fig_in.add_subplot(1, 1, 1)
+        self.ax_in.get_xaxis().set_visible(False)
+        self.ax_in.get_yaxis().set_visible(False)
+        self.ax_in.set_axis_off()
+        self.ax_in.set_title('Input')
+
+        
+        self.image = self.ax_in.imshow(np.ones((640,480)), aspect='equal')
+        keypoints = np.ones((3,17))
+        self.point= self.ax_in.scatter(*keypoints.T, 5, color='red', edgecolors='white', zorder=10)
+        ##############################################################################
+
 
 
 
@@ -748,6 +763,7 @@ class DataGenerator:
         return self
 
     def update(self):
+
             # keep looping infinitely
             while True:
                 # sys.stdout.flush()
@@ -775,11 +791,16 @@ class DataGenerator:
                         if boxes is None or boxes.nelement()==0:
                             (boxes, scores, hm_data, pt1, pt2, orig_img, im_name) = (None, None, None, None, None, orig_img, im_name.split('/')[-1])
 
-                            cv2.imwrite("/home/hrs/Desktop/dd/now.jpg", orig_img)
+                            # cv2.imwrite("/home/hrs/Desktop/dd/now.jpg", orig_img)
 
-                            img = orig_img
-                            cv2.imshow("AlphaPose Demo", img)
-                            cv2.waitKey(30)
+                            # img = orig_img
+                            # cv2.imshow("AlphaPose Demo", img)
+                            # cv2.waitKey(30)
+                            ######################################################################################
+                            self.image = self.ax_in.imshow(orig_img, aspect='equal')
+                            self.image.set_data(orig_img)
+                            ######################################################################################
+
 
                             # if opt.save_img or opt.save_video or opt.vis:
                             #     img = orig_img
@@ -830,11 +851,17 @@ class DataGenerator:
                             }
                             self.final_result.append(result) 
 
-                            img = vis_frame(orig_img, result)
-                            if opt.vis:
-                                cv2.imshow("AlphaPose Demo", img)
-                                cv2.imwrite("/home/hrs/Desktop/dd/now.jpg", img)
-                                cv2.waitKey(30)
+                            ######################################################################################
+                            # self.point.set_offsets(keypoints[self.i])
+                            # img = vis_frame(orig_img, result)
+                            
+                            # if opt.vis:
+                            #     cv2.imshow("AlphaPose Demo", img)
+                            #     cv2.imwrite("/home/hrs/Desktop/dd/now.jpg", img)
+                            #     cv2.waitKey(30)
+
+                            self.image = self.ax_in.imshow(orig_img, aspect='equal')
+                            self.image.set_data(orig_img)
 
                             if not result['result']: # No people
                                 self.Q.put(-1) #TODO

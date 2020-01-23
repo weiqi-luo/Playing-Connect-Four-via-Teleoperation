@@ -24,14 +24,14 @@ class Sequencial_animation():
         self.len_poses=1
         
         ##################################################################################
-        # # self.fig = plt.figure(figsize=(size * (1 +  self.len_poses), size))
-        # self.fig_in = plt.figure(figsize=(size , size))
-        # self.ax_in = self.fig_in.add_subplot(1, 1, 1)
-        # # self.ax_in = self.fig.add_subplot(1, 1 +  self.len_poses, 1)
-        # self.ax_in.get_xaxis().set_visible(False)
-        # self.ax_in.get_yaxis().set_visible(False)
-        # self.ax_in.set_axis_off()
-        # self.ax_in.set_title('Input')
+        # self.fig = plt.figure(figsize=(size * (1 +  self.len_poses), size))
+        self.fig_in = plt.figure(figsize=(size , size))
+        self.ax_in = self.fig_in.add_subplot(1, 1, 1)
+        # self.ax_in = self.fig.add_subplot(1, 1 +  self.len_poses, 1)
+        self.ax_in.get_xaxis().set_visible(False)
+        self.ax_in.get_yaxis().set_visible(False)
+        self.ax_in.set_axis_off()
+        self.ax_in.set_title('Input')
         ##################################################################################
         
         # self.fig.tight_layout()
@@ -109,8 +109,8 @@ class Sequencial_animation():
         # Update 2D poses
         if not self.initialized:
             ###########################################################################################################
-            # self.image = self.ax_in.imshow(current_frame, aspect='equal')
-            # self.point= self.ax_in.scatter(*keypoints[self.i].T, 5, color='red', edgecolors='white', zorder=10)
+            self.image = self.ax_in.imshow(current_frame, aspect='equal')
+            self.point= self.ax_in.scatter(*keypoints[self.i].T, 5, color='red', edgecolors='white', zorder=10)
             ###########################################################################################################
             for j, j_parent in enumerate(self.parents):
                 if j_parent == -1:

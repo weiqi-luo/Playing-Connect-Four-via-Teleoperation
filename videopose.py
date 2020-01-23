@@ -234,7 +234,8 @@ def inference_video(video_path, detector_2d):
 
 def inference_camera():
     args = parse_args()
-    main_cam(args)
+    main(args)
+    # main_cam(args)
 
 
 if __name__ == '__main__':
