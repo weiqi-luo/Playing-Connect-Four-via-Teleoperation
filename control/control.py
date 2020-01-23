@@ -3,9 +3,9 @@ import numpy as np
 import numpy.linalg as LA
 
 import time
-import almath
 import sys,math
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 
 
@@ -34,7 +34,7 @@ def init_plot3d():
     return ax
 
 
-def decompose_shoulder_rotation(v1, v2, v):
+def decompose_shoulder_rotation(v1, v2, v, ax):
     """
     input: 
         body, shoulder, arm
@@ -65,11 +65,6 @@ def decompose_shoulder_rotation(v1, v2, v):
 
     return roll, pitch
 
-    
-
-def callback_jointStates(data):
-    if not list_jointState[0]:
-        list_jointState[0] = data
 
 
 if __name__ == '__main__':
@@ -77,7 +72,7 @@ if __name__ == '__main__':
     ax = init_plot3d()
 
     #! get 3d pose 
-    pose3d = np.load("/home/hrs/ros/hrs_ws/src/final_project/data/3dpose.npy")
+    pose3d = np.load("../output/3dpose.npy")
 
     #! broadcast 3d pose to tf 
     seq = 0
