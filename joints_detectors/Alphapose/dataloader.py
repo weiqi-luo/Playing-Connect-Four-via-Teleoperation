@@ -15,6 +15,8 @@ from torch.autograd import Variable
 
 from SPPE.src.utils.eval import getPrediction, getMultiPeakPrediction
 from SPPE.src.utils.img import load_image, cropBox, im_to_torch
+from SPPE.src.main_fast_inference import *
+from common.utils import calculate_area
 from matching import candidate_reselect as matching
 from opt import opt
 from pPose_nms import pose_nms
@@ -176,6 +178,90 @@ class ImageLoader:
     def len(self):
         return self.Q.qsize()
 
+class CameraLoader:
+    def __init__(self, device=0, batchSize=1, queueSize=50):
+        self.stream = cv2.VideoCapture(device)
+        assert self.stream.isOpened(), 'Cannot capture from camera'
+        self.stopped = False
+        
+        self.batchSize = 1
+        self.datalen = 1
+        self.num_batches = 1
+
+        if opt.sp:
+            self.Q = Queue(maxsize=queueSize)
+        else:
+            self.Q = mp.Queue(maxsize=queueSize)
+    
+    def length(self):
+        return self.datalen
+
+    def start(self):
+        # start a thread to read frames from the file video stream
+        if opt.sp:
+            t = Thread(target=self.update, daemon=True, name="CameraLoader", args=())
+            t.daemon = True
+            t.start()
+        else:
+            p = mp.Process(target=self.update, args=())
+            p.daemon = True
+            p.start()
+        return self
+
+    def update(self):
+        while(True):
+            # sys.stdout.flush()
+            # print("camera load len : " + str(self.Q.qsize()))
+
+            img = []
+            orig_img = []
+            im_name = []
+            im_dim_list = []
+
+            inp_dim = int(opt.inp_dim)
+            (grabbed, frame) = self.stream.read()
+            # if the `grabbed` boolean is `False`, then we have
+            # reached the end of the video file
+            if not grabbed:
+                self.Q.put((None, None, None, None))
+                print('===========================> This video get ' + str(k) + ' frames in total.')
+                sys.stdout.flush()
+                return
+            # process and add the frame to the queue
+            img_k, orig_img_k, im_dim_list_k = prep_frame(frame, inp_dim)
+
+            img.append(img_k)
+            orig_img.append(orig_img_k)
+            im_name.append(str(0) + '.jpg')
+            im_dim_list.append(im_dim_list_k)
+
+            with torch.no_grad():
+                # Human Detection
+                img = torch.cat(img)
+                im_dim_list = torch.FloatTensor(im_dim_list).repeat(1, 2)
+
+            while self.Q.full():
+                time.sleep(2)
+
+            self.Q.put((img, orig_img, im_name, im_dim_list))
+
+    def videoinfo(self):
+        # indicate the video info
+        fourcc = int(self.stream.get(cv2.CAP_PROP_FOURCC))
+        fps = self.stream.get(cv2.CAP_PROP_FPS)
+        frameSize = (int(self.stream.get(cv2.CAP_PROP_FRAME_WIDTH)), int(self.stream.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+        return (fourcc, fps, frameSize)
+
+    def getitem(self):
+        # return next frame in the queue
+        return self.Q.get()
+
+    def len(self):
+        return self.Q.qsize()
+
+    def isrunning(self):
+        raise NotImplementedError
+
 
 class VideoLoader:
     def __init__(self, path, batchSize=1, queueSize=50):
@@ -268,7 +354,7 @@ class VideoLoader:
 
 
 class DetectionLoader:
-    def __init__(self, dataloder, batchSize=1, queueSize=1024):
+    def __init__(self, dataloder, batchSize=25, queueSize=1024):
         # initialize the file video stream along with the boolean
         # used to indicate if the thread should be stopped or not
         self.det_model = Darknet("joints_detectors/Alphapose/yolo/cfg/yolov3-spp.cfg")
@@ -298,7 +384,7 @@ class DetectionLoader:
     def start(self):
         # start a thread to read frames from the file video stream
         if opt.sp:
-            t = Thread(target=self.update, args=())
+            t = Thread(target=self.update, name="DetectionLoader", args=())
             t.daemon = True
             t.start()
         else:
@@ -309,8 +395,12 @@ class DetectionLoader:
         return self
 
     def update(self):
-        # keep looping the whole dataset
-        for i in range(self.num_batches):
+        while(True):
+            # sys.stdout.flush()
+            # print("detection loader len : " + str(self.Q.qsize()))
+
+            # keep looping the whole dataset
+            #for i in range(self.num_batches):
             img, orig_img, im_name, im_dim_list = self.dataloder.getitem()
             if img is None:
                 self.Q.put((None, None, None, None, None, None, None))
@@ -322,12 +412,12 @@ class DetectionLoader:
                 prediction = self.det_model(img, CUDA=True)
                 # NMS process
                 dets = dynamic_write_results(prediction, opt.confidence,
-                                             opt.num_classes, nms=True, nms_conf=opt.nms_thesh)
+                                            opt.num_classes, nms=True, nms_conf=opt.nms_thesh)
                 if isinstance(dets, int) or dets.shape[0] == 0:
-                    for k in range(len(orig_img)):
-                        if self.Q.full():
-                            time.sleep(2)
-                        self.Q.put((orig_img[k], im_name[k], None, None, None, None, None))
+        
+                    if self.Q.full():
+                        time.sleep(2)
+                    self.Q.put((orig_img[0], im_name[0], None, None, None, None, None))
                     continue
                 dets = dets.cpu()
                 im_dim_list = torch.index_select(im_dim_list, 0, dets[:, 0].long())
@@ -344,19 +434,19 @@ class DetectionLoader:
                 boxes = dets[:, 1:5]
                 scores = dets[:, 5:6]
 
-            for k in range(len(orig_img)):
-                boxes_k = boxes[dets[:, 0] == k]
-                if isinstance(boxes_k, int) or boxes_k.shape[0] == 0:
-                    if self.Q.full():
-                        time.sleep(2)
-                    self.Q.put((orig_img[k], im_name[k], None, None, None, None, None))
-                    continue
-                inps = torch.zeros(boxes_k.size(0), 3, opt.inputResH, opt.inputResW)
-                pt1 = torch.zeros(boxes_k.size(0), 2)
-                pt2 = torch.zeros(boxes_k.size(0), 2)
+            #for k in range(len(orig_img)):
+            boxes_k = boxes[dets[:, 0] == 0]
+            if isinstance(boxes_k, int) or boxes_k.shape[0] == 0:
                 if self.Q.full():
                     time.sleep(2)
-                self.Q.put((orig_img[k], im_name[k], boxes_k, scores[dets[:, 0] == k], inps, pt1, pt2))
+                self.Q.put((orig_img[0], im_name[0], None, None, None, None, None))
+                continue
+            inps = torch.zeros(boxes_k.size(0), 3, opt.inputResH, opt.inputResW)
+            pt1 = torch.zeros(boxes_k.size(0), 2)
+            pt2 = torch.zeros(boxes_k.size(0), 2)
+            if self.Q.full():
+                time.sleep(2)
+            self.Q.put((orig_img[0], im_name[0], boxes_k, scores[dets[:, 0] == 0], inps, pt1, pt2))
 
     def read(self):
         # return next frame in the queue
@@ -375,6 +465,7 @@ class DetectionProcessor:
         self.stopped = False
         self.datalen = self.detectionLoader.datalen
 
+        self.test = "fck"
         # initialize the queue used to store data
         if opt.sp:
             self.Q = Queue(maxsize=queueSize)
@@ -385,7 +476,7 @@ class DetectionProcessor:
         # start a thread to read frames from the file video stream
         if opt.sp:
             # t = Thread(target=self.update, args=(), daemon=True)
-            t = Thread(target=self.update, args=())
+            t = Thread(target=self.update, name="DetectionProcessor", args=())
             t.daemon = True
             t.start()
         else:
@@ -396,25 +487,29 @@ class DetectionProcessor:
         return self
 
     def update(self):
-        # keep looping the whole dataset
-        for i in range(self.datalen):
+        while(True):
+            # sys.stdout.flush()
+            # print("detection processor len : " + str(self.Q.qsize()))
 
-            with torch.no_grad():
-                (orig_img, im_name, boxes, scores, inps, pt1, pt2) = self.detectionLoader.read()
-                if orig_img is None:
-                    self.Q.put((None, None, None, None, None, None, None))
-                    return
-                if boxes is None or boxes.nelement() == 0:
+            # keep looping the whole dataset
+            for i in range(self.datalen):
+
+                with torch.no_grad():
+                    (orig_img, im_name, boxes, scores, inps, pt1, pt2) = self.detectionLoader.read()
+                    if orig_img is None:
+                        self.Q.put((None, None, None, None, None, None, None))
+                        return
+                    if boxes is None or boxes.nelement() == 0:
+                        while self.Q.full():
+                            time.sleep(0.2)
+                        self.Q.put((None, orig_img, im_name, boxes, scores, None, None))
+                        continue
+                    inp = im_to_torch(cv2.cvtColor(orig_img, cv2.COLOR_BGR2RGB))
+                    inps, pt1, pt2 = crop_from_dets(inp, boxes, inps, pt1, pt2)
+
                     while self.Q.full():
                         time.sleep(0.2)
-                    self.Q.put((None, orig_img, im_name, boxes, scores, None, None))
-                    continue
-                inp = im_to_torch(cv2.cvtColor(orig_img, cv2.COLOR_BGR2RGB))
-                inps, pt1, pt2 = crop_from_dets(inp, boxes, inps, pt1, pt2)
-
-                while self.Q.full():
-                    time.sleep(0.2)
-                self.Q.put((inps, orig_img, im_name, boxes, scores, pt1, pt2))
+                    self.Q.put((inps, orig_img, im_name, boxes, scores, pt1, pt2))
 
     def read(self):
         # return next frame in the queue
@@ -607,6 +702,201 @@ class WebcamLoader:
         # indicate that the thread should be stopped
         self.stopped = True
 
+
+
+class DataGenerator:
+    def __init__(self, det_processor, fast_inference=True, save_video=False,
+                 savepath='examples/res/camera.avi', fourcc=cv2.VideoWriter_fourcc(*'XVID'), fps=25, frameSize=(640, 480),
+                 queueSize=20,
+                 ):
+                 
+        self.test = "ffff"
+        self.Q = Queue(maxsize=queueSize)
+
+        if save_video:
+                # initialize the file video stream along with the boolean
+                # used to indicate if the thread should be stopped or not
+                self.stream = cv2.VideoWriter(savepath, fourcc, fps, frameSize)
+                assert self.stream.isOpened(), 'Cannot open video for writing'
+
+        self.det_processor = det_processor
+
+        self.final_result = []
+
+        pose_dataset = Mscoco()
+        if fast_inference:
+            self.pose_model = InferenNet_fast(4 * 1 + 1, pose_dataset)
+        else:
+            self.pose_model = InferenNet(4 * 1 + 1, pose_dataset)
+        
+        self.pose_model.cuda()
+        self.pose_model.eval()    
+
+        self.stopped = False
+
+        self.window = "2d-pose"
+
+
+
+
+    def start(self):
+        # start a thread to read frames from the file video stream
+        t = Thread(target=self.update, args=(), name="DataGenerator", daemon=True)
+        # t = Thread(target=self.update, args=())
+        # t.daemon = True
+        t.start()
+        return self
+
+    def update(self):
+            # keep looping infinitely
+            while True:
+                # sys.stdout.flush()
+                # print("generator len : " + str(self.Q.qsize()))
+
+                # if the thread indicator variable is set, stop the
+                # thread
+                if self.stopped:
+                    cv2.destroyAllWindows()
+                    if self.save_video:
+                        self.stream.release()
+                    return
+                # otherwise, ensure the queue is not empty
+                if not self.det_processor.Q.empty():
+
+                    with torch.no_grad():
+                        (inps, orig_img, im_name, boxes, scores, pt1, pt2) = self.det_processor.read()
+                        
+                        if orig_img is None:
+                            sys.stdout.flush()
+                            print(f'{im_name} image read None: handle_video')
+                            break
+
+                        orig_img = np.array(orig_img, dtype=np.uint8)
+                        if boxes is None or boxes.nelement()==0:
+                            (boxes, scores, hm_data, pt1, pt2, orig_img, im_name) = (None, None, None, None, None, orig_img, im_name.split('/')[-1])
+
+                            cv2.imwrite("/home/hrs/Desktop/dd/now.jpg", orig_img)
+
+                            img = orig_img
+                            cv2.imshow("AlphaPose Demo", img)
+                            cv2.waitKey(30)
+
+                            # if opt.save_img or opt.save_video or opt.vis:
+                            #     img = orig_img
+                            #     if opt.vis:
+                            #         cv2.imshow("AlphaPose Demo", img)
+                            #         cv2.waitKey(30)
+                            #     if opt.save_img:
+                            #         cv2.imwrite(os.path.join(opt.outputpath, 'vis', im_name), img)
+                            #     if opt.save_video:
+                            #         self.stream.write(img)
+                        else:
+                            # location prediction (n, kp, 2) | score prediction (n, kp, 1)
+
+                            datalen = inps.size(0)
+                            batchSize = 10 #args.posebatch()
+                            leftover = 0
+                            if datalen % batchSize:
+                                leftover = 1
+                            num_batches = datalen // batchSize + leftover
+                            hm = []
+
+                            # sys.stdout.flush()
+                            # print("hhhh")
+
+                            for j in range(num_batches):
+                                inps_j = inps[j * batchSize:min((j + 1) * batchSize, datalen)].cuda()
+                                hm_j = self.pose_model(inps_j)
+                                hm.append(hm_j)
+                            
+                            hm = torch.cat(hm)
+                            hm = hm.cpu().data
+
+                            (boxes, scores, hm_data, pt1, pt2, orig_img, im_name) = (boxes, scores, hm, pt1, pt2, orig_img, im_name.split('/')[-1])
+
+
+                            if opt.matching:
+                                preds = getMultiPeakPrediction(
+                                    hm_data, pt1.numpy(), pt2.numpy(), opt.inputResH, opt.inputResW, opt.outputResH, opt.outputResW)
+                                result = matching(boxes, scores.numpy(), preds)
+                            else:
+                                preds_hm, preds_img, preds_scores = getPrediction(
+                                    hm_data, pt1, pt2, opt.inputResH, opt.inputResW, opt.outputResH, opt.outputResW)
+                                result = pose_nms(
+                                    boxes, scores, preds_img, preds_scores)
+                            result = {
+                                'imgname': im_name,
+                                'result': result
+                            }
+                            self.final_result.append(result) 
+
+                            img = vis_frame(orig_img, result)
+                            if opt.vis:
+                                cv2.imshow("AlphaPose Demo", img)
+                                cv2.imwrite("/home/hrs/Desktop/dd/now.jpg", img)
+                                cv2.waitKey(30)
+
+                            if not result['result']: # No people
+                                self.Q.put(-1) #TODO
+                            else:
+                                kpt = max(result['result'],
+                                     key=lambda x: x['proposal_score'].data[0] * calculate_area(x['keypoints']), )['keypoints']
+                            
+                                self.Q.put(kpt)
+
+                                kpt_np = kpt.numpy()
+                                n = kpt_np.shape[0]
+                                # print(kpt_np.shape)
+                                # point_list = [(kpt_np[m, 0], kpt_np[m, 1]) for m in range(17)]
+                                # for point in point_list:
+                                #     cv2.circle(pose_img, point, 1, (0, 43, 32), 4)
+
+                            # cv2.imshow(self.window, pose_img)
+                            # cv2.waitKey()
+
+
+
+                            # if opt.save_img or opt.save_video or opt.vis:
+                            #     img = vis_frame(orig_img, result)
+                            #     if opt.vis:
+                            #         cv2.imshow("AlphaPose Demo", img)
+                            #         cv2.waitKey(30)
+                            #     if opt.save_img:
+                            #         cv2.imwrite(os.path.join(opt.outputpath, 'vis', im_name), img)
+                            #     if opt.save_video:
+                            #         self.stream.write(img)
+                else:
+                    time.sleep(0.1)
+
+    def running(self):
+        # indicate that the thread is still running
+        time.sleep(0.2)
+        return not self.Q.empty()
+
+    # def save(self, boxes, scores, hm_data, pt1, pt2, orig_img, im_name):
+    #     # save next frame in the queue
+    #     self.Q.put((boxes, scores, hm_data, pt1, pt2, orig_img, im_name))
+
+    def save(self):
+        raise NotImplementedError
+
+    def stop(self):
+        # indicate that the thread should be stopped
+        self.stopped = True
+        time.sleep(0.2)
+
+    def results(self):
+        # return final result
+        return self.final_result
+
+    def read(self):
+        return self.Q.get()
+
+    def len(self):
+        # return queue len
+        return self.Q.qsize()
+
+  
 
 class DataWriter:
     def __init__(self, save_video=False,

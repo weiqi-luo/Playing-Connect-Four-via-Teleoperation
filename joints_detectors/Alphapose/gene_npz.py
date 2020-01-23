@@ -9,9 +9,16 @@ from tqdm import tqdm
 from SPPE.src.main_fast_inference import *
 from common.utils import calculate_area
 from dataloader import DetectionLoader, DetectionProcessor, DataWriter, Mscoco, VideoLoader
+from dataloader import CameraLoader, DataGenerator
 from fn import getTime
 from opt import opt
 from pPose_nms import write_json
+
+from yolo.darknet import Darknet
+from yolo.preprocess import prep_image, prep_frame
+from yolo.util import dynamic_write_results
+
+from threading import enumerate
 
 args = opt
 args.dataset = 'coco'
@@ -30,6 +37,62 @@ def model_load():
 
 def image_interface(model, image):
     pass
+
+
+def handle_camera():
+    # Load input video
+    data_loader = CameraLoader().start()
+    (fourcc, fps, frameSize) = data_loader.videoinfo()
+    print('the video is {} f/s'.format(fps))
+    # =========== end video ===============
+    # Load detection loader
+    print('Loading YOLO model..')
+    sys.stdout.flush()
+    det_loader = DetectionLoader(data_loader, batchSize=args.detbatch).start()
+    #  start a thread to read frames from the file video stream
+    det_processor = DetectionProcessor(det_loader).start()
+    # Load pose model
+
+
+    runtime_profile = {
+        'dt': [],
+        'pt': [],
+        'pn': []
+    }
+    
+    #Data generator
+    generator = DataGenerator(det_processor, args.fast_inference).start()
+
+    print(enumerate())
+    # # Data writer
+    # save_path = os.path.join(args.outputpath, 'AlphaPose_' + ntpath.basename(video_file).split('.')[0] + '.avi')
+    # # writer = DataWriter(args.save_video, save_path, cv2.VideoWriter_fourcc(*'XVID'), fps, frameSize).start()
+    # writer = DataWriter(args.save_video).start()
+
+    print('Start pose estimation...')
+
+    return generator
+    # im_names_desc = tqdm(range(data_loader.length()))
+    # batchSize = args.posebatch
+    
+    # if (args.save_img or args.save_video) and not args.vis_fast:
+    #     print('===========================> Rendering remaining images in the queue...')
+    #     print('===========================> If this step takes too long, you can enable the --vis_fast flag to use fast rendering (real-time).')
+    # while writer.running():
+    #     pass
+    # writer.stop()
+    # final_result = writer.results()
+    # write_json(final_result, args.outputpath)
+
+    # return final_result, video_name
+
+def generate_kpts_online():
+    generator = handle_camera()
+
+    print(enumerate())
+    while(1):
+        print(generator.Q.get())
+        #print(generator.det_processor.Q.qsize())
 
 
 def generate_kpts(video_file):

@@ -80,30 +80,40 @@ class Skeleton:
         return [1, 2, 3, 9, 10]
 
 
+# ==================================================================================
+def main_cam(args):
+    from joints_detectors.Alphapose.gene_npz import generate_kpts_online
+    generate_kpts_online()
+
+
+
+
+
 def main(args):
+
+    from joints_detectors.Alphapose.gene_npz import handle_camera
+    generator = handle_camera()
     #! read image from camera
-    cap = cv2.VideoCapture(0)
-    kp_deque = deque(maxlen=9)
-    
-    # if(True):
-        # ret, frame = cap.read()
-        # cv2.imshow('frame',frame)
-        # if cv2.waitKey(1) & 0xFF == ord('q'):
-        #     break
+    # cap = cv2.VideoCapture(0)
+    # while(True):
+    #     ret, frame = cap.read()
+    #     cv2.imshow('frame',frame)
+    #     if cv2.waitKey(1) & 0xFF == ord('q'):
+    #         break
     
     # fake camera
-    all_frames = decode_video(downsample=args.viz_downsample, input_video_path=args.viz_video)
+    # all_frames = decode_video(downsample=args.viz_downsample, input_video_path=args.viz_video)
 
     #! 2D kpts loads or generate
-    detector_2d = get_detector_2d(args.detector_2d)
-    assert detector_2d, 'detector_2d should be in ({alpha, hr, open}_pose)'
-    # if not args.input_npz:
-    #     video_name = args.viz_video
-    #     keypoints = detector_2d(video_name)
-    # else:
-    npz = np.load("./outputs/alpha_pose_kunkun_short/kunkun_short.npz")
-    count = -1
-    keypoints = npz['kpts']  # (N, 17, 2)
+    # detector_2d = get_detector_2d(args.detector_2d)
+    # assert detector_2d, 'detector_2d should be in ({alpha, hr, open}_pose)'
+    # # if not args.input_npz:
+    # #     video_name = args.viz_video
+    # #     keypoints = detector_2d(video_name)
+    # # else:
+    # npz = np.load("./outputs/alpha_pose_kunkun_short/kunkun_short.npz")
+    # count = -1
+    # keypoints = npz['kpts']  # (N, 17, 2)
 
 
     #! visualization
@@ -144,44 +154,56 @@ def main(args):
 
 
     #! loop through the frame (now fake frame)
-    for kp in keypoints:
-        count+=1
+    # for kp in keypoints:
 
-        kp_deque.append(kp)
-        if len(kp_deque)<9:
-            continue
-        
-        #! estimate 3d pose 
-        # normlization keypoints  Suppose using the camera parameter
-        input_keypoints = normalize_screen_coordinates(np.asarray(kp_deque)[..., :2], w=1000, h=1002)
-        prediction = evaluate(input_keypoints, pad, model_pos, return_predictions=True)
+    count = 0
+    kp_deque = deque(maxlen=9)
+    try:
+        while True:
 
-        # save 3D joint points
-        # np.save('outputs/test_3d_output.npy', prediction, allow_pickle=True)
+            kp = generator.Q.get()
+            if isinstance(kp,int):
+                continue
 
-        # rotate the camera perspective
-        rot = np.array([0.14070565, -0.15007018, -0.7552408, 0.62232804], dtype=np.float32)
-        prediction = camera_to_world(prediction, R=rot, t=0)
+            kp_deque.append(kp.numpy())
+            if len(kp_deque)<9:
+                continue
+            
+            #! estimate 3d pose 
+            # normlization keypoints  Suppose using the camera parameter
+            input_keypoints = normalize_screen_coordinates(np.asarray(kp_deque)[..., :2], w=1000, h=1002)
+            prediction = evaluate(input_keypoints, pad, model_pos, return_predictions=True)
 
-        # We don't have the trajectory, but at least we can rebase the height
-        prediction[:, :, 2] -= np.min(prediction[:, :, 2])
-        input_keypoints = image_coordinates(input_keypoints[..., :2], w=1000, h=1002)
+            # save 3D joint points
+            # np.save('outputs/test_3d_output.npy', prediction, allow_pickle=True)
 
-        # ckpt, time3 = ckpt_time(time2)
-        # print('-------------- generate reconstruction 3D data spends {:.2f} seconds'.format(ckpt))
+            # rotate the camera perspective
+            rot = np.array([0.14070565, -0.15007018, -0.7552408, 0.62232804], dtype=np.float32)
+            prediction = camera_to_world(prediction, R=rot, t=0)
 
-        #! Visualization
-        sequencial_animation.call(input_keypoints, prediction, all_frames[count])   # TODO
-        time.sleep(3)
-        print("frame ",count)
-        # plt.show()  #TODO
+            # We don't have the trajectory, but at least we can rebase the height
+            prediction[:, :, 2] -= np.min(prediction[:, :, 2])
+            input_keypoints = image_coordinates(input_keypoints[..., :2], w=1000, h=1002)
 
-    pos_list = sequencial_animation.get_pos_list()
-    np.save("outputs/3dpose.npy",pos_list)
-    plt.ioff()
-    plt.show()
-    cap.release()
-    cv2.destroyAllWindows()
+            # ckpt, time3 = ckpt_time(time2)
+            # print('-------------- generate reconstruction 3D data spends {:.2f} seconds'.format(ckpt))
+
+            #! Visualization
+            sequencial_animation.call(input_keypoints, prediction)   # TODO
+            # time.sleep(3)
+            print("frame ",count)
+            count += 1
+            # plt.show()  #TODO
+
+    except KeyboardInterrupt:
+        return
+
+        pos_list = sequencial_animation.get_pos_list()
+        np.save("outputs/3dpose.npy",pos_list)
+        plt.ioff()
+        plt.show()
+        cap.release()
+        cv2.destroyAllWindows()
     
 
 def inference_video(video_path, detector_2d):
@@ -210,5 +232,10 @@ def inference_video(video_path, detector_2d):
         main(args)
 
 
+def inference_camera():
+    args = parse_args()
+    main_cam(args)
+
+
 if __name__ == '__main__':
-    inference_video('outputs/kunkun_short.mp4', 'alpha_pose')
+    inference_camera()

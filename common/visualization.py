@@ -22,14 +22,17 @@ class Sequencial_animation():
     def __init__(self,skeleton, azim,fps, size=6, limit=-1,downsample=1,i=8):
         # plt.ioff()
         self.len_poses=1
-        # self.fig = plt.figure(figsize=(size * (1 +  self.len_poses), size))
-        self.fig_in = plt.figure(figsize=(size , size))
-        self.ax_in = self.fig_in.add_subplot(1, 1, 1)
-        # self.ax_in = self.fig.add_subplot(1, 1 +  self.len_poses, 1)
-        self.ax_in.get_xaxis().set_visible(False)
-        self.ax_in.get_yaxis().set_visible(False)
-        self.ax_in.set_axis_off()
-        self.ax_in.set_title('Input')
+        
+        ##################################################################################
+        # # self.fig = plt.figure(figsize=(size * (1 +  self.len_poses), size))
+        # self.fig_in = plt.figure(figsize=(size , size))
+        # self.ax_in = self.fig_in.add_subplot(1, 1, 1)
+        # # self.ax_in = self.fig.add_subplot(1, 1 +  self.len_poses, 1)
+        # self.ax_in.get_xaxis().set_visible(False)
+        # self.ax_in.get_yaxis().set_visible(False)
+        # self.ax_in.set_axis_off()
+        # self.ax_in.set_title('Input')
+        ##################################################################################
         
         # self.fig.tight_layout()
         # prevent wired error
@@ -96,7 +99,7 @@ class Sequencial_animation():
         return np.mean(X[:length].reshape(-1, factor, *X.shape[1:]), axis=1)
 
 
-    def call(self,keypoints, data, current_frame): #TODO
+    def call(self,keypoints, data): #TODO
 
         # if self.downsample > 1:
         #     all_frames = self.downsample_tensor(np.array(current_frame), self.downsample).astype('uint8')
@@ -105,8 +108,10 @@ class Sequencial_animation():
 
         # Update 2D poses
         if not self.initialized:
-            self.image = self.ax_in.imshow(current_frame, aspect='equal')
-            self.point= self.ax_in.scatter(*keypoints[self.i].T, 5, color='red', edgecolors='white', zorder=10)
+            ###########################################################################################################
+            # self.image = self.ax_in.imshow(current_frame, aspect='equal')
+            # self.point= self.ax_in.scatter(*keypoints[self.i].T, 5, color='red', edgecolors='white', zorder=10)
+            ###########################################################################################################
             for j, j_parent in enumerate(self.parents):
                 if j_parent == -1:
                     continue
@@ -118,9 +123,11 @@ class Sequencial_animation():
             self.initialized = True
         
         else:
-            self.image = self.ax_in.imshow(current_frame, aspect='equal')
-            self.image.set_data(current_frame)
-            self.point.set_offsets(keypoints[self.i])
+            ######################################################################################
+            # self.image = self.ax_in.imshow(current_frame, aspect='equal')
+            # self.image.set_data(current_frame)
+            # self.point.set_offsets(keypoints[self.i])
+            ######################################################################################
             for j, j_parent in enumerate(self.parents):
                 if j_parent == -1:
                     continue
