@@ -117,6 +117,7 @@ def main(args):
     # count = -1
     # keypoints = npz['kpts']  # (N, 17, 2)
 
+    
 
     #! visualization
     from common.visualization import Sequencial_animation
@@ -157,12 +158,23 @@ def main(args):
 
     #! loop through the frame (now fake frame)
     # for kp in keypoints:
-
+    
     count = 0
     kp_deque = deque(maxlen=9)
     try:
+        ckpt, time3 = ckpt_time(time2)
         while True:
+            ckpt, time3 = ckpt_time(time2)
+            print('-------------- generate reconstruction 3D data spends {:.2f} seconds'.format(ckpt))
+            
             kp = generator.Q.get()
+            # continue
+            ## TODO TEST
+            cv2.imshow("before 3d",kp["image"])
+            cv2.waitKey(10)
+            
+            
+
             if isinstance(kp["keypoints"],int): 
                 sequencial_animation.call_noperson(kp["image"])
 
