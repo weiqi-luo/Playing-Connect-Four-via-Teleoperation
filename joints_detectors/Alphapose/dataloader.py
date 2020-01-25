@@ -184,6 +184,7 @@ class CameraLoader:
     def __init__(self, device=0, batchSize=1, queueSize=1):
         self.stream = cv2.VideoCapture(device)
         assert self.stream.isOpened(), 'Cannot capture from camera'
+        self.stream.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self.stopped = False
         
         self.batchSize = 1
@@ -223,8 +224,9 @@ class CameraLoader:
             inp_dim = int(opt.inp_dim)
             time_take = time.time()
             # (grabbed, frame) = self.stream.read()
-            frame = self.stream.grab()
+            grabbed, frame = self.stream.read()
             
+            print(type(frame))
             # if the `grabbed` boolean is `False`, then we have
             # reached the end of the video file
             # if not grabbed:
