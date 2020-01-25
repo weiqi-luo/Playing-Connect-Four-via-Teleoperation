@@ -41,11 +41,16 @@ def image_coordinates(X, w, h):
 
 def world_to_camera(X, R, t):
     Rt = wrap(qinverse, R)  # Invert rotation
-    return wrap(qrot, np.tile(Rt, (*X.shape[:-1], 1)), X - t)  # Rotate and translate
+    xshape = X.shape[:-1]
+    xshape.append(1)
+
+    return wrap(qrot, np.tile(Rt, xshape), X - t)  # Rotate and translate
 
 
 def camera_to_world(X, R, t):
-    return wrap(qrot, np.tile(R, (*X.shape[:-1], 1)), X) + t
+    xshape = X.shape[:-1]
+    xshape.append(1)
+    return wrap(qrot, np.tile(R, xshape), X) + t
 
 
 def project_to_2d(X, camera_params):
@@ -84,8 +89,6 @@ def project_to_2d(X, camera_params):
 
 def project_to_2d_linear(X, camera_params):
     """
-    使用linear parameters is a little difference for use linear and no-linear parameters
-    Project 3D points to 2D using only linear parameters (focal length and principal point).
 
     Arguments:
     X -- 3D points in *camera space* to transform (N, *, 3)
