@@ -1,6 +1,7 @@
 import os
 import time
 
+
 from common.arguments import parse_args
 from common.camera import *
 from common.generators import UnchunkedGenerator
@@ -49,7 +50,7 @@ def get_detector_2d(detector_name):
         'hr_pose': get_hr_pose,
         # 'open_pose': open_pose
     }
-    assert detector_name in detector_map, f'2D detector: {detector_name} not implemented yet!'
+    # assert detector_name in detector_map, f'2D detector: {detector_name} not implemented yet!'
     return detector_map[detector_name]()
 
 
@@ -91,8 +92,6 @@ def main_cam(args):
 
 def main(args):
 
-    from joints_detectors.Alphapose.gene_npz import handle_camera
-    generator = handle_camera()
     #! read image from camera
     # cap = cv2.VideoCapture(0)
     # while(True):
@@ -103,6 +102,9 @@ def main(args):
     
     # fake camera
     # all_frames = decode_video(downsample=args.viz_downsample, input_video_path=args.viz_video)
+
+    from joints_detectors.Alphapose.gene_npz import handle_camera
+    generator = handle_camera()
 
     #! 2D kpts loads or generate
     # detector_2d = get_detector_2d(args.detector_2d)
@@ -142,7 +144,7 @@ def main(args):
     #! load trained weights
     chk_filename = os.path.join(args.checkpoint, args.resume if args.resume else args.evaluate)
     print('Loading checkpoint', chk_filename)
-    checkpoint = torch.load(chk_filename, map_location=lambda storage, loc: storage)  # 把loc映射到storage
+    checkpoint = torch.load(chk_filename, map_location=lambda storage, loc: storage)
     model_pos.load_state_dict(checkpoint['model_pos'])
     #  Receptive field: 243 frames for args.arc [3, 3, 3, 3, 3]
     receptive_field = model_pos.receptive_field()
@@ -160,12 +162,11 @@ def main(args):
     kp_deque = deque(maxlen=9)
     try:
         while True:
-
             kp = generator.Q.get()
-            if isinstance(kp,int):
-                continue
+            if isinstance(kp["keypoints"],int): 
+                sequencial_animation.call_noperson(kp["image"])
 
-            kp_deque.append(kp.numpy())
+            kp_deque.append(kp["keypoints"].numpy())    
             if len(kp_deque)<9:
                 continue
             
@@ -189,7 +190,7 @@ def main(args):
             # print('-------------- generate reconstruction 3D data spends {:.2f} seconds'.format(ckpt))
 
             #! Visualization
-            sequencial_animation.call(input_keypoints, prediction)   # TODO
+            sequencial_animation.call(input_keypoints, prediction, kp["image"])   # TODO
             # time.sleep(3)
             print("frame ",count)
             count += 1
@@ -221,7 +222,7 @@ def inference_video(video_path, detector_2d):
     basename = os.path.basename(video_path)
     video_name = basename[:basename.rfind('.')]
     args.viz_video = video_path
-    args.viz_output = f'{dir_name}/{args.detector_2d}_{video_name}.mp4'
+    # args.viz_output = f'{dir_name}/{args.detector_2d}_{video_name}.mp4'
     # args.viz_limit = 20
     # args.input_npz = 'outputs/alpha_pose_dance/dance.npz'
     

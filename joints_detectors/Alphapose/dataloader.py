@@ -24,6 +24,8 @@ from yolo.darknet import Darknet
 from yolo.preprocess import prep_image, prep_frame
 from yolo.util import dynamic_write_results
 from matplotlib import pyplot as plt
+import matplotlib
+matplotlib.use( 'tkagg' )
 # import the Queue class from Python 3
 if sys.version_info >= (3, 0):
     from queue import Queue, LifoQueue
@@ -179,7 +181,7 @@ class ImageLoader:
         return self.Q.qsize()
 
 class CameraLoader:
-    def __init__(self, device=0, batchSize=1, queueSize=50):
+    def __init__(self, device=0, batchSize=1, queueSize=1):
         self.stream = cv2.VideoCapture(device)
         assert self.stream.isOpened(), 'Cannot capture from camera'
         self.stopped = False
@@ -264,7 +266,7 @@ class CameraLoader:
 
 
 class VideoLoader:
-    def __init__(self, path, batchSize=1, queueSize=50):
+    def __init__(self, path, batchSize=1, queueSize=1):
         # initialize the file video stream along with the boolean
         # used to indicate if the thread should be stopped or not
         self.path = path
@@ -354,7 +356,7 @@ class VideoLoader:
 
 
 class DetectionLoader:
-    def __init__(self, dataloder, batchSize=25, queueSize=1024):
+    def __init__(self, dataloder, batchSize=25, queueSize=1):
         # initialize the file video stream along with the boolean
         # used to indicate if the thread should be stopped or not
         self.det_model = Darknet("joints_detectors/Alphapose/yolo/cfg/yolov3-spp.cfg")
@@ -458,7 +460,7 @@ class DetectionLoader:
 
 
 class DetectionProcessor:
-    def __init__(self, detectionLoader, queueSize=1024):
+    def __init__(self, detectionLoader, queueSize=1):
         # initialize the file video stream along with the boolean
         # used to indicate if the thread should be stopped or not
         self.detectionLoader = detectionLoader
@@ -707,7 +709,7 @@ class WebcamLoader:
 class DataGenerator:
     def __init__(self, det_processor, fast_inference=True, save_video=False,
                  savepath='examples/res/camera.avi', fourcc=cv2.VideoWriter_fourcc(*'XVID'), fps=25, frameSize=(640, 480),
-                 queueSize=20,
+                 queueSize=1,
                  ):
                  
         self.test = "ffff"
@@ -747,8 +749,10 @@ class DataGenerator:
 
         
         self.image = self.ax_in.imshow(np.ones((640,480)), aspect='equal')
-        keypoints = np.ones((3,17))
-        self.point= self.ax_in.scatter(*keypoints.T, 5, color='red', edgecolors='white', zorder=10)
+        keypoints = np.ones((2,17))
+        self.point= self.ax_in.scatter(*keypoints, 5, color='red', edgecolors='white', zorder=10)
+
+        # plt.ion()
         ##############################################################################
 
 
@@ -791,14 +795,20 @@ class DataGenerator:
                         if boxes is None or boxes.nelement()==0:
                             (boxes, scores, hm_data, pt1, pt2, orig_img, im_name) = (None, None, None, None, None, orig_img, im_name.split('/')[-1])
 
+                            res = {'keypoints': -1,
+                                   'image': orig_img}
+                            self.Q.put(res) #TODO
+
                             # cv2.imwrite("/home/hrs/Desktop/dd/now.jpg", orig_img)
 
                             # img = orig_img
                             # cv2.imshow("AlphaPose Demo", img)
                             # cv2.waitKey(30)
                             ######################################################################################
-                            self.image = self.ax_in.imshow(orig_img, aspect='equal')
-                            self.image.set_data(orig_img)
+                            # self.image = self.ax_in.imshow(orig_img, aspect='equal')
+                            # self.image.set_data(orig_img)
+                            # plt.draw()
+                            # plt.pause(0.000000000000000001)
                             ######################################################################################
 
 
@@ -852,27 +862,34 @@ class DataGenerator:
                             self.final_result.append(result) 
 
                             ######################################################################################
-                            # self.point.set_offsets(keypoints[self.i])
                             # img = vis_frame(orig_img, result)
                             
-                            # if opt.vis:
-                            #     cv2.imshow("AlphaPose Demo", img)
-                            #     cv2.imwrite("/home/hrs/Desktop/dd/now.jpg", img)
-                            #     cv2.waitKey(30)
+                            # cv2.imshow("AlphaPose Demo", img)
+                            # cv2.imwrite("/home/hrs/Desktop/dd/now.jpg", img)
+                            # cv2.waitKey(30)
+                            ########################################################################
+                            # self.point.set_offsets(keypoints[self.i])
 
-                            self.image = self.ax_in.imshow(orig_img, aspect='equal')
-                            self.image.set_data(orig_img)
-
+                            # self.image = self.ax_in.imshow(orig_img, aspect='equal')
+                            # self.image.set_data(orig_img)
+                            # plt.draw()
+                            # plt.pause(0.000000000000000001)
+                            ##########################################################################
                             if not result['result']: # No people
-                                self.Q.put(-1) #TODO
+                                res = {'keypoints': -1,
+                                       'image': orig_img}
+                                self.Q.put(res) #TODO
                             else:
                                 kpt = max(result['result'],
                                      key=lambda x: x['proposal_score'].data[0] * calculate_area(x['keypoints']), )['keypoints']
-                            
-                                self.Q.put(kpt)
 
-                                kpt_np = kpt.numpy()
-                                n = kpt_np.shape[0]
+                                res = {'keypoints': kpt,
+                                       'image': orig_img}
+                            
+                                self.Q.put(res)
+
+                                # kpt_np = kpt.numpy()
+                                # n = kpt_np.shape[0]
                                 # print(kpt_np.shape)
                                 # point_list = [(kpt_np[m, 0], kpt_np[m, 1]) for m in range(17)]
                                 # for point in point_list:
