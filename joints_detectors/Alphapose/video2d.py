@@ -78,91 +78,27 @@ else:
 
 
 def handle_camera():
-    # Load input video
-    data_loader = CameraLoader().start()
-    # Load detection loader
-    print('Loading YOLO model..')
-    det_loader = DetectionLoader(data_loader, batchSize=args.detbatch).start()
-    #  start a thread to read frames from the file video stream
-    # det_processor = DetectionProcessor(det_loader).start()
+    det_loader = DetectionLoader(batchSize=args.detbatch).start()
     return det_loader
 
 
 ##########################################################################################
 ##########################################################################################
 
-class CameraLoader:
-    def __init__(self, device=0, batchSize=1, queueSize=1):
-        self.stream = cv2.VideoCapture(device)
-        assert self.stream.isOpened(), 'Cannot capture from camera'
-        self.stream.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-        self.stopped = False
-        
-        self.batchSize = 1
-        self.datalen = 1
-        self.num_batches = 1
-
+class DetectionLoader:
+    def __init__(self, batchSize=1, queueSize=1):
+        ## queue
         if opt.sp:
             self.Q = Queue(maxsize=queueSize)
         else:
             self.Q = mp.Queue(maxsize=queueSize)
-    
-    def length(self):
-        return self.datalen
+        ## camera stream
+        self.stream = cv2.VideoCapture(0)
+        assert self.stream.isOpened(), 'Cannot capture from camera'
+        self.stream.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        self.inp_dim = int(opt.inp_dim)
 
-    def start(self):
-        # start a thread to read frames from the file video stream
-        if opt.sp:
-            t = Thread(target=self.update, daemon=True, name="CameraLoader", args=())
-            t.daemon = True
-            t.start()
-        else:
-            p = mp.Process(target=self.update, args=())
-            p.daemon = True
-            p.start()
-        return self
-
-    def update(self):
-        while(True):
-            sys.stdout.flush()
-            print("camera load len : " + str(self.Q.qsize()))
-
-            img = []
-            orig_img = []
-            im_name = []
-            im_dim_list = []
-
-            inp_dim = int(opt.inp_dim)
-            time_take = time.time()
-            # (grabbed, frame) = self.stream.read()
-            grabbed, frame = self.stream.read()
-            img_k, orig_img_k, im_dim_list_k = prep_frame(frame, inp_dim)
-            
-            img.append(img_k)
-            orig_img.append(orig_img_k)
-            im_name.append(str(time.time()) + '.jpg')
-            im_dim_list.append(im_dim_list_k)
-
-            with torch.no_grad():
-                # Human Detection
-                img = torch.cat(img)
-                im_dim_list = torch.FloatTensor(im_dim_list).repeat(1, 2)
-
-            self.Q.put((img, orig_img, im_name, im_dim_list))
-
-
-    def getitem(self):
-        # return next frame in the queue
-        return self.Q.get()
-
-
-##########################################################################################
-##########################################################################################
-
-class DetectionLoader:
-    def __init__(self, dataloder, batchSize=1, queueSize=1):
-        # initialize the file video stream along with the boolean
-        # used to indicate if the thread should be stopped or not
+        ## yolo model
         self.det_model = Darknet("joints_detectors/Alphapose/yolo/cfg/yolov3-spp.cfg")
         self.det_model.load_weights('joints_detectors/Alphapose/models/yolo/yolov3-spp.weights')
         self.det_model.net_info['height'] = opt.inp_dim
@@ -171,27 +107,14 @@ class DetectionLoader:
         assert self.det_inp_dim > 32
         self.det_model.cuda()
         self.det_model.eval()
-
-        self.stopped = False
-        self.dataloder = dataloder
         self.batchSize = batchSize
-        self.datalen = self.dataloder.length()
+        self.datalen = 1
         leftover = 0
         if (self.datalen) % batchSize:
             leftover = 1
         self.num_batches = self.datalen // batchSize + leftover
-        # initialize the queue used to store frames read from
-        # the video file
-        if opt.sp:
-            self.Q = Queue(maxsize=queueSize)
-        else:
-            self.Q = mp.Queue(maxsize=queueSize)
 
-
-        ##!
-        # initialize the file video stream along with the boolean
-        # used to indicate if the thread should be stopped or not
-        ########
+        ## alphapose model
         fast_inference = False
         pose_dataset = Mscoco()
         if fast_inference:
@@ -211,22 +134,24 @@ class DetectionLoader:
             t.start()
         else:
             p = mp.Process(target=self.update, args=(), daemon=True)
-            # p = mp.Process(target=self.update, args=())
-            # p.daemon = True
             p.start()
         return self
 
     def update(self):
         while(True):
-            sys.stdout.flush()
-            print("detection loader len : " + str(self.Q.qsize()))
+            grabbed, frame = self.stream.read()
+            img_k, orig_img_k, im_dim_list_k = prep_frame(frame, self.inp_dim)
+            
+            img = [img_k]
+            orig_img = [orig_img_k]
+            im_name = ["im_name"]
+            im_dim_list = [im_dim_list_k] 
 
-            # keep looping the whole dataset
-            #for i in range(self.num_batches):
-            img, orig_img, im_name, im_dim_list = self.dataloder.getitem()
-            if img is None or orig_img is None:
-                self.Q.put((None, None, None, None, None, None, None))
-                return
+            img = torch.cat(img)
+            im_dim_list = torch.FloatTensor(im_dim_list).repeat(1, 2)
+
+            ### detector 
+            #########################
 
             with torch.no_grad():
                 # Human Detection
@@ -239,6 +164,7 @@ class DetectionLoader:
         
                     self.Q.put((orig_img[0], im_name[0], None, None, None, None, None))
                     continue
+                
                 dets = dets.cpu()
                 im_dim_list = torch.index_select(im_dim_list, 0, dets[:, 0].long())
                 scaling_factor = torch.min(self.det_inp_dim / im_dim_list, 1)[0].view(-1, 1)
@@ -266,14 +192,14 @@ class DetectionLoader:
                 pt2 = torch.zeros(boxes_k.size(0), 2)
 
 
-            ###! processor and generator
-            #############!
+                ### processor 
+                #########################
                 orig_img = orig_img[0]
                 inp = im_to_torch(cv2.cvtColor(orig_img, cv2.COLOR_BGR2RGB))
                 inps, pt1, pt2 = self.crop_from_dets(inp, boxes, inps, pt1, pt2)
 
-
-                ###############            
+                ### generator
+                #########################            
                 orig_img = np.array(orig_img, dtype=np.uint8)
                 # location prediction (n, kp, 2) | score prediction (n, kp, 1)
 
@@ -290,7 +216,7 @@ class DetectionLoader:
                     hm_j = self.pose_model(inps_j)
                     hm.append(hm_j)
                 
-                # time1 = time.time()
+                
                 hm = torch.cat(hm)
                 hm = hm.cpu().data
 
