@@ -141,19 +141,12 @@ class Sequencial_animation():
         plt.pause(0.000000000000000001)
 
 
-        def call_noperson(self, current_frame): #TODO
-            # Update 2D poses
-            if not self.initialized:
-                ###########################################################################################################
-                self.image = self.ax_in.imshow(current_frame, aspect='equal')
-                self.point= self.ax_in.scatter(*keypoints[self.i].T, 5, color='red', edgecolors='white', zorder=10)
-                ###########################################################################################################
-            else:
-                ######################################################################################
-                self.image = self.ax_in.imshow(current_frame, aspect='equal')
-                self.image.set_data(current_frame)
-                self.point.set_offsets(keypoints[self.i])
-                ######################################################################################
-            # anim = FuncAnimation(self.fig, update_video, frames=limit, interval=1000.0 / self.fps, repeat=False)
-            plt.draw()
-            plt.pause(0.000000000000000001)
+    def call_noperson(self, current_frame): #TODO
+        # Update 2D poses
+        if not self.initialized:
+            self.image = self.ax_in.imshow(current_frame, aspect='equal')
+        else:
+            self.image = self.ax_in.imshow(current_frame, aspect='equal')
+            self.image.set_data(current_frame)
+        plt.draw()
+        plt.pause(0.000000000000000001)

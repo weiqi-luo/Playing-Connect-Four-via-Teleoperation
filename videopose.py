@@ -128,12 +128,13 @@ def main(args):
             kp = generator.Q.get()
             
             ## TODO TEST
-            cv2.imshow("before 3d",kp["image"])
-            cv2.waitKey(10)
+            # cv2.imshow("before 3d",kp["image"])
+            # cv2.waitKey(10)
             # continue            
 
             if isinstance(kp["keypoints"],int): 
                 sequencial_animation.call_noperson(kp["image"])
+                continue
 
             kp_deque.append(kp["keypoints"].numpy())    
             if len(kp_deque)<9:
