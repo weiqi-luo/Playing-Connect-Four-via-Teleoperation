@@ -108,7 +108,10 @@ class DetectionLoader:
 
         time1 = time.time()
 
-        grabbed, frame = self.stream.read()
+        _, frame = self.stream.read()
+        frame = cv2.resize(frame, (frame.shape[1]//2,frame.shape[0]//2))
+        frame = frame[:,:150,:]
+
         img_k, self.orig_img, im_dim_list_k = prep_frame(frame, self.inp_dim)
         
         img = [img_k]
@@ -119,8 +122,6 @@ class DetectionLoader:
         im_dim_list = torch.FloatTensor(im_dim_list).repeat(1, 2)
 
         time2 = time.time()
-
-        
 
 
         with torch.no_grad():
@@ -133,7 +134,7 @@ class DetectionLoader:
             dets = dynamic_write_results(prediction, opt.confidence,
                                         opt.num_classes, nms=True, nms_conf=opt.nms_thesh)
             if isinstance(dets, int) or dets.shape[0] == 0:   
-                raise NotImplementedError
+                return None
                 
             
             dets = dets.cpu()
