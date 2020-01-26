@@ -249,6 +249,10 @@ class CameraLoader:
                 img = torch.cat(img)
                 im_dim_list = torch.FloatTensor(im_dim_list).repeat(1, 2)
 
+            sys.stdout.flush()
+            print(img.shape)
+
+
             # while self.Q.full():
             #     time.sleep(2)
 

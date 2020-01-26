@@ -172,7 +172,7 @@ def main(args):
             ## TODO TEST
             cv2.imshow("before 3d",kp["image"])
             cv2.waitKey(10)
-            
+            # continue
             
 
             if isinstance(kp["keypoints"],int): 
