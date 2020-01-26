@@ -72,14 +72,6 @@ if opt.vis_fast:
 else:
     from fn import vis_frame
 
-##########################################################################################
-##########################################################################################
-
-
-def handle_camera():
-    det_loader = DetectionLoader(batchSize=args.detbatch).start()
-    return det_loader
-
 
 ##########################################################################################
 ##########################################################################################
@@ -125,122 +117,103 @@ class DetectionLoader:
         self.pose_model.eval() 
 
 
-    def start(self):
-        # start a thread to read frames from the file video stream
-        if opt.sp:
-            t = Thread(target=self.update, name="DetectionLoader", args=())
-            t.daemon = True
-            t.start()
-        else:
-            p = mp.Process(target=self.update, args=(), daemon=True)
-            p.start()
-        return self
-
     def update(self):
-        while(True):
-            grabbed, frame = self.stream.read()
-            img_k, orig_img_k, im_dim_list_k = prep_frame(frame, self.inp_dim)
-            
-            img = [img_k]
-            orig_img = [orig_img_k]
-            im_name = ["im_name"]
-            im_dim_list = [im_dim_list_k] 
-
-            img = torch.cat(img)
-            im_dim_list = torch.FloatTensor(im_dim_list).repeat(1, 2)
-
-            ### detector 
-            #########################
-
-            with torch.no_grad():
-                # Human Detection
-                img = img.cuda()
-                prediction = self.det_model(img, CUDA=True)
-                # NMS process
-                dets = dynamic_write_results(prediction, opt.confidence,
-                                            opt.num_classes, nms=True, nms_conf=opt.nms_thesh)
-                if isinstance(dets, int) or dets.shape[0] == 0:
+        grabbed, frame = self.stream.read()
+        img_k, orig_img_k, im_dim_list_k = prep_frame(frame, self.inp_dim)
         
-                    self.Q.put((orig_img[0], im_name[0], None, None, None, None, None))
-                    continue
+        img = [img_k]
+        orig_img = [orig_img_k]
+        im_name = ["im_name"]
+        im_dim_list = [im_dim_list_k] 
+
+        img = torch.cat(img)
+        im_dim_list = torch.FloatTensor(im_dim_list).repeat(1, 2)
+
+        ### detector 
+        #########################
+
+        with torch.no_grad():
+            # Human Detection
+            img = img.cuda()
+            prediction = self.det_model(img, CUDA=True)
+            # NMS process
+            dets = dynamic_write_results(prediction, opt.confidence,
+                                        opt.num_classes, nms=True, nms_conf=opt.nms_thesh)
+            if isinstance(dets, int) or dets.shape[0] == 0:   
+                raise NotImplementedError
                 
-                dets = dets.cpu()
-                im_dim_list = torch.index_select(im_dim_list, 0, dets[:, 0].long())
-                scaling_factor = torch.min(self.det_inp_dim / im_dim_list, 1)[0].view(-1, 1)
-
-                # coordinate transfer
-                dets[:, [1, 3]] -= (self.det_inp_dim - scaling_factor * im_dim_list[:, 0].view(-1, 1)) / 2
-                dets[:, [2, 4]] -= (self.det_inp_dim - scaling_factor * im_dim_list[:, 1].view(-1, 1)) / 2
-
-                dets[:, 1:5] /= scaling_factor
-                for j in range(dets.shape[0]):
-                    dets[j, [1, 3]] = torch.clamp(dets[j, [1, 3]], 0.0, im_dim_list[j, 0])
-                    dets[j, [2, 4]] = torch.clamp(dets[j, [2, 4]], 0.0, im_dim_list[j, 1])
-                boxes = dets[:, 1:5]
-                scores = dets[:, 5:6]
-
-                #for k in range(len(orig_img)):
-                boxes_k = boxes[dets[:, 0] == 0]
-                if isinstance(boxes_k, int) or boxes_k.shape[0] == 0:
-                    res = {'keypoints': -1,
-                            'image': orig_img}
-                    self.Q.put(res) #TODO
-                    continue
-                inps = torch.zeros(boxes_k.size(0), 3, opt.inputResH, opt.inputResW)
-                pt1 = torch.zeros(boxes_k.size(0), 2)
-                pt2 = torch.zeros(boxes_k.size(0), 2)
-
-
-                ### processor 
-                #########################
-                orig_img = orig_img[0]
-                inp = im_to_torch(cv2.cvtColor(orig_img, cv2.COLOR_BGR2RGB))
-                inps, pt1, pt2 = self.crop_from_dets(inp, boxes, inps, pt1, pt2)
-
-                ### generator
-                #########################            
-                orig_img = np.array(orig_img, dtype=np.uint8)
-                # location prediction (n, kp, 2) | score prediction (n, kp, 1)
-
-                datalen = inps.size(0)
-                batchSize = 20 #args.posebatch()
-                leftover = 0
-                if datalen % batchSize:
-                    leftover = 1
-                num_batches = datalen // batchSize + leftover
-                hm = []
-
-                for j in range(num_batches):
-                    inps_j = inps[j * batchSize:min((j + 1) * batchSize, datalen)].cuda()
-                    hm_j = self.pose_model(inps_j)
-                    hm.append(hm_j)
-                
-                
-                hm = torch.cat(hm)
-                hm = hm.cpu().data
-
-                preds_hm, preds_img, preds_scores = getPrediction(
-                    hm, pt1, pt2, opt.inputResH, opt.inputResW, opt.outputResH, opt.outputResW)
-                result = pose_nms(
-                    boxes, scores, preds_img, preds_scores)
-                        
-                if not result: # No people
-                    res = {'keypoints': -1,
-                            'image': orig_img}
-                    self.Q.put(res) #TODO
-                else:
-                    kpt = max(result,
-                            key=lambda x: x['proposal_score'].data[0] * calculate_area(x['keypoints']), )['keypoints']
-
-                    res = {'keypoints': kpt,
-                            'image': orig_img}
-                
-                    self.Q.put(res)
             
+            dets = dets.cpu()
+            im_dim_list = torch.index_select(im_dim_list, 0, dets[:, 0].long())
+            scaling_factor = torch.min(self.det_inp_dim / im_dim_list, 1)[0].view(-1, 1)
 
-    def read(self):
-        # return next frame in the queue
-        return self.Q.get()
+            # coordinate transfer
+            dets[:, [1, 3]] -= (self.det_inp_dim - scaling_factor * im_dim_list[:, 0].view(-1, 1)) / 2
+            dets[:, [2, 4]] -= (self.det_inp_dim - scaling_factor * im_dim_list[:, 1].view(-1, 1)) / 2
+
+            dets[:, 1:5] /= scaling_factor
+            for j in range(dets.shape[0]):
+                dets[j, [1, 3]] = torch.clamp(dets[j, [1, 3]], 0.0, im_dim_list[j, 0])
+                dets[j, [2, 4]] = torch.clamp(dets[j, [2, 4]], 0.0, im_dim_list[j, 1])
+            boxes = dets[:, 1:5]
+            scores = dets[:, 5:6]
+
+            #for k in range(len(orig_img)):
+            boxes_k = boxes[dets[:, 0] == 0]
+            if isinstance(boxes_k, int) or boxes_k.shape[0] == 0:
+                res = {'keypoints': -1,
+                        'image': orig_img}
+                return res 
+            inps = torch.zeros(boxes_k.size(0), 3, opt.inputResH, opt.inputResW)
+            pt1 = torch.zeros(boxes_k.size(0), 2)
+            pt2 = torch.zeros(boxes_k.size(0), 2)
+
+
+            ### processor 
+            #########################
+            orig_img = orig_img[0]
+            inp = im_to_torch(cv2.cvtColor(orig_img, cv2.COLOR_BGR2RGB))
+            inps, pt1, pt2 = self.crop_from_dets(inp, boxes, inps, pt1, pt2)
+
+            ### generator
+            #########################            
+            orig_img = np.array(orig_img, dtype=np.uint8)
+            # location prediction (n, kp, 2) | score prediction (n, kp, 1)
+
+            datalen = inps.size(0)
+            batchSize = 20 #args.posebatch()
+            leftover = 0
+            if datalen % batchSize:
+                leftover = 1
+            num_batches = datalen // batchSize + leftover
+            hm = []
+
+            for j in range(num_batches):
+                inps_j = inps[j * batchSize:min((j + 1) * batchSize, datalen)].cuda()
+                hm_j = self.pose_model(inps_j)
+                hm.append(hm_j)
+            
+            
+            hm = torch.cat(hm)
+            hm = hm.cpu().data
+
+            preds_hm, preds_img, preds_scores = getPrediction(
+                hm, pt1, pt2, opt.inputResH, opt.inputResW, opt.outputResH, opt.outputResW)
+            result = pose_nms(
+                boxes, scores, preds_img, preds_scores)
+                    
+            if not result: # No people
+                res = {'keypoints': -1,
+                        'image': orig_img}
+                return res 
+            else:
+                kpt = max(result,
+                        key=lambda x: x['proposal_score'].data[0] * calculate_area(x['keypoints']), )['keypoints']
+
+                res = {'keypoints': kpt,
+                        'image': orig_img}
+                return res 
+            
 
 
     def crop_from_dets(self,img, boxes, inps, pt1, pt2):

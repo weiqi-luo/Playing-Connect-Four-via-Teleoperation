@@ -63,17 +63,9 @@ class Skeleton:
 
 def main(args):
 
-    #! read image from camera
-    # cap = cv2.VideoCapture(0)
-    # while(True):
-    #     ret, frame = cap.read()
-    #     cv2.imshow('frame',frame)
-    #     if cv2.waitKey(1) & 0xFF == ord('q'):
-    #         break
-    
-
-    from joints_detectors.Alphapose.video2d import handle_camera
-    generator = handle_camera()
+    #! read image from camera   
+    from joints_detectors.Alphapose.video2d import DetectionLoader
+    det_loader = DetectionLoader()
    
 
     #! visualization
@@ -125,7 +117,7 @@ def main(args):
             print('-------------- generate reconstruction 3D data spends {:.2f} seconds'.format(ckpt))
             
             #! get 2d key points
-            kp = generator.Q.get()
+            kp = det_loader.update()
             
             ## TODO TEST
             # cv2.imshow("before 3d",kp["image"])
