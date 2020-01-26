@@ -60,12 +60,6 @@ from yolo.util import dynamic_write_results
 from matplotlib import pyplot as plt
 import matplotlib
 matplotlib.use( 'tkagg' )
-# import the Queue class from Python 3
-if sys.version_info >= (3, 0):
-    from queue import Queue, LifoQueue
-# otherwise, import the Queue class for Python 2.7
-else:
-    from Queue import Queue, LifoQueue
 
 if opt.vis_fast:
     from fn import vis_frame_fast as vis_frame
@@ -77,12 +71,8 @@ else:
 ##########################################################################################
 
 class DetectionLoader:
-    def __init__(self, batchSize=1, queueSize=1):
-        ## queue
-        if opt.sp:
-            self.Q = Queue(maxsize=queueSize)
-        else:
-            self.Q = mp.Queue(maxsize=queueSize)
+    def __init__(self, batchSize=1, queueSize=1, size=100):
+
         ## camera stream
         self.stream = cv2.VideoCapture(0)
         assert self.stream.isOpened(), 'Cannot capture from camera'
@@ -116,23 +106,33 @@ class DetectionLoader:
         self.pose_model.cuda()
         self.pose_model.eval() 
 
+        ## 2d plotting
+        self.fig_in = plt.figure(figsize=(size , size))
+        self.ax_in = self.fig_in.add_subplot(1, 1, 1)
+        self.ax_in.get_xaxis().set_visible(False)
+        self.ax_in.get_yaxis().set_visible(False)
+        self.ax_in.set_axis_off()
+        self.ax_in.set_title('Input')
+        self.initialized = False
+        self.size=size
+        
+
 
     def update(self):
         grabbed, frame = self.stream.read()
-        img_k, orig_img_k, im_dim_list_k = prep_frame(frame, self.inp_dim)
+        img_k, self.orig_img, im_dim_list_k = prep_frame(frame, self.inp_dim)
         
         img = [img_k]
-        orig_img = [orig_img_k]
         im_name = ["im_name"]
         im_dim_list = [im_dim_list_k] 
 
         img = torch.cat(img)
         im_dim_list = torch.FloatTensor(im_dim_list).repeat(1, 2)
 
-        ### detector 
-        #########################
 
         with torch.no_grad():
+            ### detector 
+            #########################
             # Human Detection
             img = img.cuda()
             prediction = self.det_model(img, CUDA=True)
@@ -158,12 +158,10 @@ class DetectionLoader:
             boxes = dets[:, 1:5]
             scores = dets[:, 5:6]
 
-            #for k in range(len(orig_img)):
             boxes_k = boxes[dets[:, 0] == 0]
             if isinstance(boxes_k, int) or boxes_k.shape[0] == 0:
-                res = {'keypoints': -1,
-                        'image': orig_img}
-                return res 
+                raise NotImplementedError
+                return None
             inps = torch.zeros(boxes_k.size(0), 3, opt.inputResH, opt.inputResW)
             pt1 = torch.zeros(boxes_k.size(0), 2)
             pt2 = torch.zeros(boxes_k.size(0), 2)
@@ -171,13 +169,12 @@ class DetectionLoader:
 
             ### processor 
             #########################
-            orig_img = orig_img[0]
-            inp = im_to_torch(cv2.cvtColor(orig_img, cv2.COLOR_BGR2RGB))
+            inp = im_to_torch(cv2.cvtColor(self.orig_img, cv2.COLOR_BGR2RGB))
             inps, pt1, pt2 = self.crop_from_dets(inp, boxes, inps, pt1, pt2)
 
             ### generator
             #########################            
-            orig_img = np.array(orig_img, dtype=np.uint8)
+            self.orig_img = np.array(self.orig_img, dtype=np.uint8)
             # location prediction (n, kp, 2) | score prediction (n, kp, 1)
 
             datalen = inps.size(0)
@@ -203,16 +200,13 @@ class DetectionLoader:
                 boxes, scores, preds_img, preds_scores)
                     
             if not result: # No people
-                res = {'keypoints': -1,
-                        'image': orig_img}
-                return res 
+                self.visualize2dnoperson()
+                return None
             else:
-                kpt = max(result,
+                self.kpt = max(result,
                         key=lambda x: x['proposal_score'].data[0] * calculate_area(x['keypoints']), )['keypoints']
-
-                res = {'keypoints': kpt,
-                        'image': orig_img}
-                return res 
+                self.visualize2d()
+                return self.kpt 
             
 
 
@@ -220,7 +214,6 @@ class DetectionLoader:
         '''
         Crop human from origin image according to Dectecion Results
         '''
-
         imght = img.size(1)
         imgwidth = img.size(2)
         tmp_img = img
@@ -256,6 +249,26 @@ class DetectionLoader:
             pt2[i] = bottomRight
 
         return inps, pt1, pt2
+
+
+    def visualize2d(self):
+        if not self.initialized:
+            self.image = self.ax_in.imshow(self.orig_img, aspect='equal')
+            self.point= self.ax_in.scatter(*self.kpt.T, 5, color='red', edgecolors='white', zorder=10)
+            self.initialized = True
+        else:
+            self.image = self.ax_in.imshow(self.orig_img, aspect='equal')
+            self.image.set_data(self.orig_img)
+            self.point.set_offsets(self.kpt)
+
+
+    def visualize2dnoperson(self): #TODO
+        # Update 2D poses
+        if not self.initialized:
+            self.image = self.ax_in.imshow(self.orig_img, aspect='equal')
+        else:
+            self.image = self.ax_in.imshow(self.orig_img, aspect='equal')
+            self.image.set_data(self.orig_img)
 
 
 
