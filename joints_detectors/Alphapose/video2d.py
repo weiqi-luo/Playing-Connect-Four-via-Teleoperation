@@ -182,28 +182,16 @@ class DetectionLoader:
         self.dataloder = dataloder
         self.batchSize = batchSize
         self.datalen = self.dataloder.length()
+        leftover = 0
+        if (self.datalen) % batchSize:
+            leftover = 1
+        self.num_batches = self.datalen // batchSize + leftover
         # initialize the queue used to store frames read from
         # the video file
         if opt.sp:
             self.Q = Queue(maxsize=queueSize)
         else:
             self.Q = mp.Queue(maxsize=queueSize)
-
-
-        ##################################################################3
-        ##################################################################3
-
-        ##################################################################3
-        ##################################################################3
-        fast_inference = False
-        pose_dataset = Mscoco()
-        if fast_inference:
-            self.pose_model = InferenNet_fast(4 * 1 + 1, pose_dataset)
-        else:
-            self.pose_model = InferenNet(4 * 1 + 1, pose_dataset)
-        
-        self.pose_model.cuda()
-        self.pose_model.eval()   
 
     def start(self):
         # start a thread to read frames from the file video stream
@@ -224,6 +212,7 @@ class DetectionLoader:
             print("detection loader len : " + str(self.Q.qsize()))
 
             # keep looping the whole dataset
+            #for i in range(self.num_batches):
             img, orig_img, im_name, im_dim_list = self.dataloder.getitem()
             if img is None:
                 self.Q.put((None, None, None, None, None, None, None))
@@ -266,65 +255,9 @@ class DetectionLoader:
 
             self.Q.put((orig_img[0], im_name[0], boxes_k, scores[dets[:, 0] == 0], inps, pt1, pt2))
 
-            # dataprocessor
+
             #############
-
-            if orig_img is None:
-                    self.Q.put((None, None, None, None, None, None, None))
-                    return
-                if boxes is None or boxes.nelement() == 0:
-                    res = {'keypoints': -1,
-                            'image': orig_img}
-                    self.Q.put(res) #TODO
-                    continue
-                inp = im_to_torch(cv2.cvtColor(orig_img, cv2.COLOR_BGR2RGB))
-                inps, pt1, pt2 = self.crop_from_dets(inp, boxes, inps, pt1, pt2)
-
-                # datagenerator
-                ###############                    
-
-                orig_img = np.array(orig_img, dtype=np.uint8)
-                # location prediction (n, kp, 2) | score prediction (n, kp, 1)
-
-                datalen = inps.size(0)
-                batchSize = 20 #args.posebatch()
-                leftover = 0
-                if datalen % batchSize:
-                    leftover = 1
-                num_batches = datalen // batchSize + leftover
-                hm = []
-
-                for j in range(num_batches):
-                    inps_j = inps[j * batchSize:min((j + 1) * batchSize, datalen)].cuda()
-                    hm_j = self.pose_model(inps_j)
-                    hm.append(hm_j)
-                
-                # time1 = time.time()
-                hm = torch.cat(hm)
-                hm = hm.cpu().data
-
-                if opt.matching:
-                    preds = getMultiPeakPrediction(
-                        hm, pt1.numpy(), pt2.numpy(), opt.inputResH, opt.inputResW, opt.outputResH, opt.outputResW)
-                    result = matching(boxes, scores.numpy(), preds)
-                else:
-                    preds_hm, preds_img, preds_scores = getPrediction(
-                        hm, pt1, pt2, opt.inputResH, opt.inputResW, opt.outputResH, opt.outputResW)
-                    result = pose_nms(
-                        boxes, scores, preds_img, preds_scores)
-                        
-                if not result: # No people
-                    res = {'keypoints': -1,
-                            'image': orig_img}
-                    self.Q.put(res) #TODO
-                else:
-                    kpt = max(result,
-                            key=lambda x: x['proposal_score'].data[0] * calculate_area(x['keypoints']), )['keypoints']
-
-                    res = {'keypoints': kpt,
-                            'image': orig_img}
-                
-                    self.Q.put(res)
+            
 
     def read(self):
         # return next frame in the queue
