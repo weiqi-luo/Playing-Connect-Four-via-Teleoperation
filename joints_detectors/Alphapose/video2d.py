@@ -79,10 +79,10 @@ else:
 
 def handle_camera():
     # Load input video
-    # data_loader = CameraLoader().start()
+    data_loader = CameraLoader().start()
     # Load detection loader
     print('Loading YOLO model..')
-    det_loader = DetectionLoader(batchSize=args.detbatch).start()
+    det_loader = DetectionLoader(data_loader, batchSize=args.detbatch).start()
     #  start a thread to read frames from the file video stream
     # det_processor = DetectionProcessor(det_loader).start()
     return det_loader
@@ -160,10 +160,7 @@ class CameraLoader:
 ##########################################################################################
 
 class DetectionLoader:
-    def __init__(self, batchSize=1, queueSize=1,device=0):
-        self.stream = cv2.VideoCapture(device)
-        assert self.stream.isOpened(), 'Cannot capture from camera'
-        self.stream.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    def __init__(self, dataloder, batchSize=1, queueSize=1):
         # initialize the file video stream along with the boolean
         # used to indicate if the thread should be stopped or not
         self.det_model = Darknet("joints_detectors/Alphapose/yolo/cfg/yolov3-spp.cfg")
@@ -176,8 +173,9 @@ class DetectionLoader:
         self.det_model.eval()
 
         self.stopped = False
+        self.dataloder = dataloder
         self.batchSize = batchSize
-        self.datalen = 1
+        self.datalen = self.dataloder.length()
         leftover = 0
         if (self.datalen) % batchSize:
             leftover = 1
@@ -193,8 +191,8 @@ class DetectionLoader:
         ##!
         # initialize the file video stream along with the boolean
         # used to indicate if the thread should be stopped or not
-        ######## TODO
-        fast_inference = True
+        ########
+        fast_inference = False
         pose_dataset = Mscoco()
         if fast_inference:
             self.pose_model = InferenNet_fast(4 * 1 + 1, pose_dataset)
@@ -220,9 +218,12 @@ class DetectionLoader:
 
     def update(self):
         while(True):
-            grabbed, frame = self.stream.read()
-            img, orig_img, im_dim_list = prep_frame(frame, inp_dim)
+            sys.stdout.flush()
+            print("detection loader len : " + str(self.Q.qsize()))
+
             # keep looping the whole dataset
+            #for i in range(self.num_batches):
+            img, orig_img, im_name, im_dim_list = self.dataloder.getitem()
             if img is None or orig_img is None:
                 self.Q.put((None, None, None, None, None, None, None))
                 return
