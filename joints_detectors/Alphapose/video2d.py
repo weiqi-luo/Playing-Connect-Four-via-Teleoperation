@@ -1,10 +1,17 @@
-import ntpath
-import os
+import ntpath, os, sys, time
 import shutil
-
+import cv2
+from PIL import Image
 import numpy as np
-import torch.utils.data
 from tqdm import tqdm
+
+import torch.utils.data
+import torch
+import torch.multiprocessing as mp
+import torch.utils.data as data
+import torchvision.transforms as transforms
+from torch.autograd import Variable
+
 
 from SPPE.src.main_fast_inference import *
 from common.utils import calculate_area
@@ -32,25 +39,11 @@ if not args.sp:
 ##########################################################################################
 
 
-import os
-import sys
-import time
-from multiprocessing import Queue as pQueue
-from threading import Thread
 
-import cv2
-import numpy as np
-import torch
-import torch.multiprocessing as mp
-import torch.utils.data as data
-import torchvision.transforms as transforms
-from PIL import Image
-from torch.autograd import Variable
 
 from SPPE.src.utils.eval import getPrediction, getMultiPeakPrediction
 from SPPE.src.utils.img import load_image, cropBox, im_to_torch
 from SPPE.src.main_fast_inference import *
-from common.utils import calculate_area
 from matching import candidate_reselect as matching
 from opt import opt
 from pPose_nms import pose_nms
