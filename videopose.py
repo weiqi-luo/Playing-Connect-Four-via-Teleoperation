@@ -31,27 +31,7 @@ def ckpt_time(ckpt=None):
         return time.time()
     else:
         return time.time() - float(ckpt), time.time()
-
-
 time0 = ckpt_time()
-
-
-def get_detector_2d(detector_name):
-    def get_alpha_pose():
-        from joints_detectors.Alphapose.gene_npz import generate_kpts as alpha_pose
-        return alpha_pose
-
-    def get_hr_pose():
-        from joints_detectors.hrnet.pose_estimation.video import generate_kpts as hr_pose
-        return hr_pose
-
-    detector_map = {
-        'alpha_pose': get_alpha_pose,
-        'hr_pose': get_hr_pose,
-        # 'open_pose': open_pose
-    }
-    # assert detector_name in detector_map, f'2D detector: {detector_name} not implemented yet!'
-    return detector_map[detector_name]()
 
 
 def decode_video(downsample=1,input_video_path=None,input_video_skip=0,limit=0):
@@ -81,15 +61,6 @@ class Skeleton:
         return [1, 2, 3, 9, 10]
 
 
-# ==================================================================================
-def main_cam(args):
-    from joints_detectors.Alphapose.gene_npz import generate_kpts_online
-    generate_kpts_online()
-
-
-
-
-
 def main(args):
 
     #! read image from camera
@@ -100,24 +71,10 @@ def main(args):
     #     if cv2.waitKey(1) & 0xFF == ord('q'):
     #         break
     
-    # fake camera
-    # all_frames = decode_video(downsample=args.viz_downsample, input_video_path=args.viz_video)
 
-    from joints_detectors.Alphapose.gene_npz import handle_camera
+    from joints_detectors.Alphapose.video2d import handle_camera
     generator = handle_camera()
-
-    #! 2D kpts loads or generate
-    # detector_2d = get_detector_2d(args.detector_2d)
-    # assert detector_2d, 'detector_2d should be in ({alpha, hr, open}_pose)'
-    # # if not args.input_npz:
-    # #     video_name = args.viz_video
-    # #     keypoints = detector_2d(video_name)
-    # # else:
-    # npz = np.load("./outputs/alpha_pose_kunkun_short/kunkun_short.npz")
-    # count = -1
-    # keypoints = npz['kpts']  # (N, 17, 2)
-
-    
+   
 
     #! visualization
     from common.visualization import Sequencial_animation
@@ -164,16 +121,16 @@ def main(args):
     try:
         ckpt, time3 = ckpt_time(time2)
         while True:
-            ckpt, time3 = ckpt_time(time2)
+            ckpt, time3 = ckpt_time(time3)
             print('-------------- generate reconstruction 3D data spends {:.2f} seconds'.format(ckpt))
             
+            #! get 2d key points
             kp = generator.Q.get()
-            # continue
+            
             ## TODO TEST
             cv2.imshow("before 3d",kp["image"])
             cv2.waitKey(10)
-            # continue
-            
+            # continue            
 
             if isinstance(kp["keypoints"],int): 
                 sequencial_animation.call_noperson(kp["image"])
@@ -198,51 +155,18 @@ def main(args):
             prediction[:, :, 2] -= np.min(prediction[:, :, 2])
             input_keypoints = image_coordinates(input_keypoints[..., :2], w=1000, h=1002)
 
-            # ckpt, time3 = ckpt_time(time2)
-            # print('-------------- generate reconstruction 3D data spends {:.2f} seconds'.format(ckpt))
 
             #! Visualization
             sequencial_animation.call(input_keypoints, prediction, kp["image"])   # TODO
-            # time.sleep(3)
             print("frame ",count)
             count += 1
             # plt.show()  #TODO
 
+
     except KeyboardInterrupt:
-        return
-
-        pos_list = sequencial_animation.get_pos_list()
-        np.save("outputs/3dpose.npy",pos_list)
         plt.ioff()
-        plt.show()
-        cap.release()
         cv2.destroyAllWindows()
-    
-
-def inference_video(video_path, detector_2d):
-    """
-    Do image -> 2d points -> 3d points to video.
-    :param detector_2d: used 2d joints detector. Can be {alpha_pose, hr_pose}
-    :param video_path: relative to outputs
-    :return: None
-    """
-    args = parse_args()
-    print(args)
-
-    args.detector_2d = detector_2d
-    dir_name = os.path.dirname(video_path)
-    basename = os.path.basename(video_path)
-    video_name = basename[:basename.rfind('.')]
-    args.viz_video = video_path
-    # args.viz_output = f'{dir_name}/{args.detector_2d}_{video_name}.mp4'
-    # args.viz_limit = 20
-    # args.input_npz = 'outputs/alpha_pose_dance/dance.npz'
-    
-
-    args.evaluate = 'pretrained_h36m_detectron_coco.bin'
-
-    with Timer(video_path):
-        main(args)
+        return
 
 
 def inference_camera():
