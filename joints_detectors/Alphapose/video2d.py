@@ -1,5 +1,7 @@
 import ntpath, os, sys, time
 import shutil
+## import in gene_npz
+
 import cv2
 from PIL import Image
 import numpy as np
@@ -34,22 +36,13 @@ if not args.sp:
     torch.multiprocessing.set_start_method('forkserver', force=True)
     torch.multiprocessing.set_sharing_strategy('file_system')
 
-
-##########################################################################################
-##########################################################################################
-
-
-
+############# import in dataloader
 
 from SPPE.src.utils.eval import getPrediction, getMultiPeakPrediction
 from SPPE.src.utils.img import load_image, cropBox, im_to_torch
 from SPPE.src.main_fast_inference import *
 from matching import candidate_reselect as matching
-from opt import opt
 from pPose_nms import pose_nms
-from yolo.darknet import Darknet
-from yolo.preprocess import prep_image, prep_frame
-from yolo.util import dynamic_write_results
 from matplotlib import pyplot as plt
 import matplotlib
 matplotlib.use( 'tkagg' )
