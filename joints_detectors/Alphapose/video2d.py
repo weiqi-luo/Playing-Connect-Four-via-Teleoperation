@@ -109,8 +109,8 @@ class DetectionLoader:
         time1 = time.time()
 
         _, frame = self.stream.read()
-        frame = cv2.resize(frame, (frame.shape[1]//2,frame.shape[0]//2))
-        frame = frame[:,:150,:]
+        # frame = cv2.resize(frame, (frame.shape[1]//2,frame.shape[0]//2))
+        # frame = frame[:,:150,:]
 
         img_k, self.orig_img, im_dim_list_k = prep_frame(frame, self.inp_dim)
         
@@ -134,6 +134,7 @@ class DetectionLoader:
             dets = dynamic_write_results(prediction, opt.confidence,
                                         opt.num_classes, nms=True, nms_conf=opt.nms_thesh)
             if isinstance(dets, int) or dets.shape[0] == 0:   
+                self.visualize2dnoperson()
                 return None
                 
             
@@ -154,6 +155,7 @@ class DetectionLoader:
 
             boxes_k = boxes[dets[:, 0] == 0]
             if isinstance(boxes_k, int) or boxes_k.shape[0] == 0:
+                self.visualize2dnoperson()
                 raise NotImplementedError
                 return None
             inps = torch.zeros(boxes_k.size(0), 3, opt.inputResH, opt.inputResW)
