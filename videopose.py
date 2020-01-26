@@ -94,8 +94,7 @@ def main(args):
             
             #! get 2d key points
             kp = det_loader.update()
-
-            if isinstance(kp,int): 
+            if kp is None:
                 continue
 
             kp_deque.append(kp.numpy())    

@@ -82,7 +82,7 @@ class DetectionLoader:
         self.num_batches = self.datalen // batchSize + leftover
 
         ## alphapose model
-        fast_inference = False
+        fast_inference = True
         pose_dataset = Mscoco()
         if fast_inference:
             self.pose_model = InferenNet_fast(4 * 1 + 1, pose_dataset)
@@ -105,6 +105,9 @@ class DetectionLoader:
 
 
     def update(self):
+
+        time1 = time.time()
+
         grabbed, frame = self.stream.read()
         img_k, self.orig_img, im_dim_list_k = prep_frame(frame, self.inp_dim)
         
@@ -114,6 +117,10 @@ class DetectionLoader:
 
         img = torch.cat(img)
         im_dim_list = torch.FloatTensor(im_dim_list).repeat(1, 2)
+
+        time2 = time.time()
+
+        
 
 
         with torch.no_grad():
@@ -152,6 +159,8 @@ class DetectionLoader:
             pt1 = torch.zeros(boxes_k.size(0), 2)
             pt2 = torch.zeros(boxes_k.size(0), 2)
 
+            time3 = time.time()
+
 
             ### processor 
             #########################
@@ -171,6 +180,8 @@ class DetectionLoader:
             num_batches = datalen // batchSize + leftover
             hm = []
 
+            time4 = time.time()
+
             for j in range(num_batches):
                 inps_j = inps[j * batchSize:min((j + 1) * batchSize, datalen)].cuda()
                 hm_j = self.pose_model(inps_j)
@@ -184,6 +195,9 @@ class DetectionLoader:
                 hm, pt1, pt2, opt.inputResH, opt.inputResW, opt.outputResH, opt.outputResW)
             result = pose_nms(
                 boxes, scores, preds_img, preds_scores)
+
+            time5 = time.time() 
+            
                     
             if not result: # No people
                 self.visualize2dnoperson()
@@ -193,6 +207,9 @@ class DetectionLoader:
                         key=lambda x: x['proposal_score'].data[0] * calculate_area(x['keypoints']), )['keypoints']
                 self.visualize2d()
                 return self.kpt 
+
+            time6 = time.time()
+            print("process time : {} ".format(time6 - time5))
             
 
 ##########################################################################################
@@ -250,7 +267,6 @@ class DetectionLoader:
             self.point= self.ax_in.scatter(*self.kpt.T, 5, color='red', edgecolors='white', zorder=10)
             self.initialized = True
         else:
-            self.image = self.ax_in.imshow(self.orig_img, aspect='equal')
             self.image.set_data(self.orig_img)
             self.point.set_offsets(self.kpt)
 
@@ -260,7 +276,6 @@ class DetectionLoader:
         if not self.initialized:
             self.image = self.ax_in.imshow(self.orig_img, aspect='equal')
         else:
-            self.image = self.ax_in.imshow(self.orig_img, aspect='equal')
             self.image.set_data(self.orig_img)
 
 
