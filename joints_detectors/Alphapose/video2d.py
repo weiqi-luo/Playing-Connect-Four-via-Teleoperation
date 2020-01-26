@@ -8,7 +8,6 @@ from tqdm import tqdm
 
 from SPPE.src.main_fast_inference import *
 from common.utils import calculate_area
-from video2d_class import Mscoco, VideoLoader
 from fn import getTime
 from opt import opt
 from pPose_nms import write_json
