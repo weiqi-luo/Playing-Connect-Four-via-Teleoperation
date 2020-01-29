@@ -1,6 +1,7 @@
 import ntpath, os, sys, time
 import shutil
 ## import in gene_npz
+from pylab import get_current_fig_manager
 
 import cv2
 from PIL import Image
@@ -57,10 +58,10 @@ else:
 ##########################################################################################
 
 class DetectionLoader:
-    def __init__(self, batchSize=1, queueSize=1, size=100):
+    def __init__(self, batchSize=1, queueSize=1, size=100, device=0):
 
         ## camera stream
-        self.stream = cv2.VideoCapture(0)
+        self.stream = cv2.VideoCapture(device)
         assert self.stream.isOpened(), 'Cannot capture from camera'
         self.stream.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self.inp_dim = int(opt.inp_dim)
@@ -101,6 +102,8 @@ class DetectionLoader:
         self.ax_in.set_title('Input')
         self.initialized = False
         self.size=size
+        thismanager = get_current_fig_manager()
+        thismanager.window.wm_geometry("+0-1000")
         
 
 
