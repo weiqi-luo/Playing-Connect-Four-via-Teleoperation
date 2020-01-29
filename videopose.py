@@ -66,7 +66,9 @@ def main(args):
     fig_angle = plt.figure()
     ax1 = fig_angle.add_subplot(211)
     ax2 = fig_angle.add_subplot(212)
-    angle_animation1 = RealtimePlot(fig_angle, ax1, "LShoulderRoll","r")
+    angle_animation1_n = RealtimePlot(fig_angle, ax1, "LShoulderRoll","r")
+    angle_animation2_n = RealtimePlot(fig_angle, ax2, "LShoulderPitch","r")
+    angle_animation1 = RealtimePlot(fig_angle, ax1, "LShoulderRoll","y")
     angle_animation2 = RealtimePlot(fig_angle, ax2, "LShoulderPitch","y")
     thismanager = get_current_fig_manager()
     thismanager.window.wm_geometry("+1000+0")
@@ -121,7 +123,7 @@ def main(args):
     #! loop through the frame (now fake frame)
     ckpt, time3 = ckpt_time(time2)
 
-    q_LShoulderPitch, q_RShoulderPitch, q_LShoulderRoll, q_RShoulderRoll = queue.Queue(maxsize=20), queue.Queue(maxsize=20), queue.Queue(maxsize=20), queue.Queue(maxsize=20)
+    q_LShoulderPitch, q_RShoulderPitch, q_LShoulderRoll, q_RShoulderRoll = [deque(maxlen=7) for i in range(4) ]
     try:
         while True:
             frame = -1
@@ -171,28 +173,36 @@ def main(args):
                 LShoulderRoll, LShoulderPitch,lupperarm_t = compute_shoulder_rotation(larm_upper, coord)
                 RShoulderRoll, RShoulderPitch,rupperarm_t = compute_shoulder_rotation(rarm_upper, coord)
 
-                # q_LShoulderPitch.get(LShoulderPitch)
-                # q_LShoulderRoll.get(LShoulderRoll)
-                # q_RShoulderPitch.get(RShoulderPitch)
-                # q_RShoulderRoll.get(RShoulderRoll)
+                LShoulderPitch_n = filter_data(q_LShoulderPitch, LShoulderPitch, median_filter)
+                LShoulderRoll_n = filter_data(q_LShoulderRoll,  LShoulderRoll, median_filter)
+                RShoulderPitch_n = filter_data(q_RShoulderPitch, RShoulderPitch, median_filter)
+                RShoulderRoll_n = filter_data(q_RShoulderRoll,  RShoulderRoll, median_filter)
+                
 
                 # msg_LShoulderPitch = if q_LShoulderPitch.full()
                 
                 #! Plot angle
-                angle_animation1.call(frame,math.degrees(RShoulderRoll))
-                angle_animation2.call(frame,math.degrees(RShoulderPitch))
+                print("ShoulderRoll_n {} ShoulderPitch_n {} ".format(math.degrees(LShoulderRoll_n), math.degrees(LShoulderPitch_n)))
+                angle_animation1_n.call(frame,math.degrees(LShoulderRoll_n))
+                angle_animation2_n.call(frame,math.degrees(LShoulderPitch_n))
+                angle_animation1.call(frame,math.degrees(LShoulderRoll))
+                angle_animation2.call(frame,math.degrees(LShoulderPitch))
+
+                # angle_animation1_n.call(frame, LShoulderRoll_n)
+                # angle_animation2_n.call(frame, LShoulderPitch_n)
+                # angle_animation1.call(frame,   LShoulderRoll)
+                # angle_animation2.call(frame,   LShoulderPitch)
                 
                 # arm_animation1.call(frame,lupperarm_t[0])
                 # arm_animation2.call(frame,lupperarm_t[1])
                 # arm_animation3.call(frame,lupperarm_t[2])
 
                 #! send ucp
-                message = np.array((frame,LShoulderRoll, LShoulderPitch, RShoulderRoll, RShoulderPitch))
+                message = np.array((frame,LShoulderRoll_n, LShoulderPitch_n, RShoulderRoll_n, RShoulderPitch_n))
                 MESSAGE = message.astype(np.float16).tostring()
                 sock.sendto(MESSAGE, (UDP_IP, UDP_PORT))
-                print(sys.getsizeof(MESSAGE))
-                print(message)
-                return()
+                # print(sys.getsizeof(MESSAGE))
+                # print(message)
 
     except KeyboardInterrupt:
         plt.ioff()
