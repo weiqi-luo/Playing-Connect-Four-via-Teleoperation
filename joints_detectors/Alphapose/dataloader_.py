@@ -184,6 +184,7 @@ class CameraLoader:
     def __init__(self, device=0, batchSize=1, queueSize=1):
         self.stream = cv2.VideoCapture(device)
         assert self.stream.isOpened(), 'Cannot capture from camera'
+        self.stream.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         self.stopped = False
         
         self.batchSize = 1
@@ -212,8 +213,8 @@ class CameraLoader:
 
     def update(self):
         while(True):
-            # sys.stdout.flush()
-            # print("camera load len : " + str(self.Q.qsize()))
+            sys.stdout.flush()
+            print("camera load len : " + str(self.Q.qsize()))
 
             img = []
             orig_img = []
@@ -221,20 +222,26 @@ class CameraLoader:
             im_dim_list = []
 
             inp_dim = int(opt.inp_dim)
-            (grabbed, frame) = self.stream.read()
+            time_take = time.time()
+            # (grabbed, frame) = self.stream.read()
+            grabbed, frame = self.stream.read()
+            
+            print(type(frame))
             # if the `grabbed` boolean is `False`, then we have
             # reached the end of the video file
-            if not grabbed:
-                self.Q.put((None, None, None, None))
-                print('===========================> This video get ' + str(k) + ' frames in total.')
-                sys.stdout.flush()
-                return
+            # if not grabbed:
+            #     self.Q.put((None, None, None, None))
+            #     print('===========================> This video get ' + str(k) + ' frames in total.')
+            #     sys.stdout.flush()
+            #     return
             # process and add the frame to the queue
             img_k, orig_img_k, im_dim_list_k = prep_frame(frame, inp_dim)
-
+            # cv2.imshow("camera", frame)
+            # cv2.waitKey(10)
+            
             img.append(img_k)
             orig_img.append(orig_img_k)
-            im_name.append(str(0) + '.jpg')
+            im_name.append(str(time.time()) + '.jpg')
             im_dim_list.append(im_dim_list_k)
 
             with torch.no_grad():
@@ -242,10 +249,16 @@ class CameraLoader:
                 img = torch.cat(img)
                 im_dim_list = torch.FloatTensor(im_dim_list).repeat(1, 2)
 
-            while self.Q.full():
-                time.sleep(2)
+            sys.stdout.flush()
+            print(img.shape)
+
+
+            # while self.Q.full():
+            #     time.sleep(2)
 
             self.Q.put((img, orig_img, im_name, im_dim_list))
+            time_save = time.time()
+
 
     def videoinfo(self):
         # indicate the video info
@@ -356,7 +369,7 @@ class VideoLoader:
 
 
 class DetectionLoader:
-    def __init__(self, dataloder, batchSize=25, queueSize=1):
+    def __init__(self, dataloder, batchSize=1, queueSize=1):
         # initialize the file video stream along with the boolean
         # used to indicate if the thread should be stopped or not
         self.det_model = Darknet("joints_detectors/Alphapose/yolo/cfg/yolov3-spp.cfg")
@@ -398,8 +411,8 @@ class DetectionLoader:
 
     def update(self):
         while(True):
-            # sys.stdout.flush()
-            # print("detection loader len : " + str(self.Q.qsize()))
+            sys.stdout.flush()
+            print("detection loader len : " + str(self.Q.qsize()))
 
             # keep looping the whole dataset
             #for i in range(self.num_batches):
@@ -417,8 +430,8 @@ class DetectionLoader:
                                             opt.num_classes, nms=True, nms_conf=opt.nms_thesh)
                 if isinstance(dets, int) or dets.shape[0] == 0:
         
-                    if self.Q.full():
-                        time.sleep(2)
+                    # if self.Q.full():
+                    #     time.sleep(2)
                     self.Q.put((orig_img[0], im_name[0], None, None, None, None, None))
                     continue
                 dets = dets.cpu()
@@ -439,15 +452,17 @@ class DetectionLoader:
             #for k in range(len(orig_img)):
             boxes_k = boxes[dets[:, 0] == 0]
             if isinstance(boxes_k, int) or boxes_k.shape[0] == 0:
-                if self.Q.full():
-                    time.sleep(2)
+                # if self.Q.full():
+                #     time.sleep(2)
                 self.Q.put((orig_img[0], im_name[0], None, None, None, None, None))
                 continue
             inps = torch.zeros(boxes_k.size(0), 3, opt.inputResH, opt.inputResW)
             pt1 = torch.zeros(boxes_k.size(0), 2)
             pt2 = torch.zeros(boxes_k.size(0), 2)
-            if self.Q.full():
-                time.sleep(2)
+            # if self.Q.full():
+            #     time.sleep(2)
+
+
             self.Q.put((orig_img[0], im_name[0], boxes_k, scores[dets[:, 0] == 0], inps, pt1, pt2))
 
     def read(self):
@@ -490,8 +505,8 @@ class DetectionProcessor:
 
     def update(self):
         while(True):
-            # sys.stdout.flush()
-            # print("detection processor len : " + str(self.Q.qsize()))
+            sys.stdout.flush()
+            print("detection processor len : " + str(self.Q.qsize()))
 
             # keep looping the whole dataset
             for i in range(self.datalen):
@@ -502,15 +517,17 @@ class DetectionProcessor:
                         self.Q.put((None, None, None, None, None, None, None))
                         return
                     if boxes is None or boxes.nelement() == 0:
-                        while self.Q.full():
-                            time.sleep(0.2)
+                        # while self.Q.full():
+                        #     time.sleep(0.2)
                         self.Q.put((None, orig_img, im_name, boxes, scores, None, None))
                         continue
                     inp = im_to_torch(cv2.cvtColor(orig_img, cv2.COLOR_BGR2RGB))
                     inps, pt1, pt2 = crop_from_dets(inp, boxes, inps, pt1, pt2)
 
-                    while self.Q.full():
-                        time.sleep(0.2)
+                    # while self.Q.full():
+                    #     time.sleep(0.2)
+
+
                     self.Q.put((inps, orig_img, im_name, boxes, scores, pt1, pt2))
 
     def read(self):
@@ -738,24 +755,19 @@ class DataGenerator:
 
         self.window = "2d-pose"
 
-        ###############################################################################
-        size = 6
-        self.fig_in = plt.figure(figsize=(size , size))
-        self.ax_in = self.fig_in.add_subplot(1, 1, 1)
-        self.ax_in.get_xaxis().set_visible(False)
-        self.ax_in.get_yaxis().set_visible(False)
-        self.ax_in.set_axis_off()
-        self.ax_in.set_title('Input')
+        # ###############################################################################
+        # size = 6
+        # self.fig_in = plt.figure(figsize=(size , size))
+        # self.ax_in = self.fig_in.add_subplot(1, 1, 1)
+        # self.ax_in.get_xaxis().set_visible(False)
+        # self.ax_in.get_yaxis().set_visible(False)
+        # self.ax_in.set_axis_off()
+        # self.ax_in.set_title('Input')
 
         
-        self.image = self.ax_in.imshow(np.ones((640,480)), aspect='equal')
-        keypoints = np.ones((2,17))
-        self.point= self.ax_in.scatter(*keypoints, 5, color='red', edgecolors='white', zorder=10)
-
-        # plt.ion()
-        ##############################################################################
-
-
+        # self.image = self.ax_in.imshow(np.ones((640,480)), aspect='equal')
+        # keypoints = np.ones((2,17))
+        # self.point= self.ax_in.scatter(*keypoints, 5, color='red', edgecolors='white', zorder=10)
 
 
     def start(self):
@@ -770,16 +782,16 @@ class DataGenerator:
 
             # keep looping infinitely
             while True:
-                # sys.stdout.flush()
-                # print("generator len : " + str(self.Q.qsize()))
+                sys.stdout.flush()
+                print("generator len : " + str(self.Q.qsize()))
 
                 # if the thread indicator variable is set, stop the
                 # thread
-                if self.stopped:
-                    cv2.destroyAllWindows()
-                    if self.save_video:
-                        self.stream.release()
-                    return
+                # if self.stopped:
+                #     cv2.destroyAllWindows()
+                #     if self.save_video:
+                #         self.stream.release()
+                #     return
                 # otherwise, ensure the queue is not empty
                 if not self.det_processor.Q.empty():
 
@@ -825,7 +837,7 @@ class DataGenerator:
                             # location prediction (n, kp, 2) | score prediction (n, kp, 1)
 
                             datalen = inps.size(0)
-                            batchSize = 10 #args.posebatch()
+                            batchSize = 20 #args.posebatch()
                             leftover = 0
                             if datalen % batchSize:
                                 leftover = 1
@@ -840,6 +852,7 @@ class DataGenerator:
                                 hm_j = self.pose_model(inps_j)
                                 hm.append(hm_j)
                             
+                            # time1 = time.time()
                             hm = torch.cat(hm)
                             hm = hm.cpu().data
 
@@ -861,6 +874,8 @@ class DataGenerator:
                             }
                             self.final_result.append(result) 
 
+                            # time2 = time.time()
+                            # print(time2-time1)
                             ######################################################################################
                             # img = vis_frame(orig_img, result)
                             
