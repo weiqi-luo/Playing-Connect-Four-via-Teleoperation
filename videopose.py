@@ -71,8 +71,8 @@ def main(args):
     angle_animation2_n = RealtimePlot(fig_angle, ax2, "LShoulderPitch","r")
     angle_animation1 = RealtimePlot(fig_angle, ax1, "LShoulderRoll","y")
     angle_animation2 = RealtimePlot(fig_angle, ax2, "LShoulderPitch","y")
-    angle_animation_turningangle = RealtimePlot(fig_angle, ax1, "turning angle","y")
-    angle_animation_turning = RealtimePlot(fig_angle, ax2, "turning","r")
+    angle_animation_turningangle = RealtimePlot(fig_angle, ax3, "turning angle","y")
+    angle_animation_turning = RealtimePlot(fig_angle, ax3, "turning","r")
     thismanager = get_current_fig_manager()
     thismanager.window.wm_geometry("+1000+0")
     
@@ -126,7 +126,10 @@ def main(args):
     #! loop through the frame (now fake frame)
     ckpt, time3 = ckpt_time(time2)
 
-    q_LShoulderPitch, q_RShoulderPitch, q_LShoulderRoll, q_RShoulderRoll = [deque(maxlen=7) for i in range(4) ]
+    #! Prepare deque for 8 joints
+    q_LShoulderPitch, q_RShoulderPitch, q_LShoulderRoll, q_RShoulderRoll = [deque(maxlen=7) for i in range(4)]
+    q_LElbowYaw, q_RElbowYaw, q_LElbowRoll, q_RElbowRoll = [deque(maxlen=7) for i in range(4)]
+
     try:
         while True:
             frame = -1
@@ -167,33 +170,45 @@ def main(args):
                     prediction[11], prediction[12], prediction[14], prediction[15], prediction[8], prediction[7], prediction[13], prediction[16]
                 LHip, RHip = prediction[4], prediction[1]
                 
-                larm_upper = LElbow - LShoulder
-                rarm_upper = RElbow - RShoulder
-                larm_lower = LElbow - LWrist
-                rarm_lower = RElbow - RWrist
+                left_upperarm = LElbow - LShoulder
+                right_upperarm = RElbow - RShoulder
+                left_lowerarm = LElbow - LWrist
+                right_lowerarm = RElbow - RWrist
                 
+                #### Remapping ####
                 coord = compute_torso_coord(Neck, LHip, RHip)
-                LShoulderRoll, LShoulderPitch,lupperarm_t = compute_shoulder_rotation(larm_upper, coord)
-                RShoulderRoll, RShoulderPitch,rupperarm_t = compute_shoulder_rotation(rarm_upper, coord)
+                LShoulderRoll, LShoulderPitch, left_upperarm_t = compute_shoulder_rotation(left_upperarm, coord)
+                RShoulderRoll, RShoulderPitch, right_upperarm_t = compute_shoulder_rotation(right_upperarm, coord)
 
+                LElbowYaw, LElbowRoll, left_upperarm_t, left_lowerarm_t = compute_elbow_rotation(left_upperarm, left_lowerarm, coord)
+                RElbowYaw, RElbowRoll, right_upperarm_t, right_lowerarm_t = compute_elbow_rotation(right_upperarm, right_lowerarm, coord)
+
+                #### Filtering ####
                 LShoulderPitch_n = filter_data(q_LShoulderPitch, LShoulderPitch, median_filter)
                 LShoulderRoll_n = filter_data(q_LShoulderRoll,  LShoulderRoll, median_filter)
                 RShoulderPitch_n = filter_data(q_RShoulderPitch, RShoulderPitch, median_filter)
                 RShoulderRoll_n = filter_data(q_RShoulderRoll,  RShoulderRoll, median_filter)
                 
-                compute_turning(coord[2])
+                LElbowYaw_n = filter_data(q_LElbowYaw, LElbowYaw, median_filter)
+                LElbowRoll_n = filter_data(q_LElbowRoll,  LElbowRoll, median_filter)
+                RElbowYaw_n = filter_data(q_RElbowYaw, RElbowYaw, median_filter)
+                RElbowRoll_n = filter_data(q_RElbowRoll,  RElbowRoll, median_filter)
+
+                Turning, turningangle = compute_turning(coord[2])
                 # msg_LShoulderPitch = if q_LShoulderPitch.full()
 
 
                 
                 #! Plot angle
-                print("ShoulderRoll_n {} ShoulderPitch_n {} ".format(math.degrees(LShoulderRoll_n), math.degrees(LShoulderPitch_n)))
-                angle_animation1_n.call(frame,math.degrees(LShoulderRoll_n))
-                angle_animation2_n.call(frame,math.degrees(LShoulderPitch_n))
-                angle_animation1.call(frame,math.degrees(LShoulderRoll))
-                angle_animation2.call(frame,math.degrees(LShoulderPitch))
-                angle_animation_turningangle.call(frame,math.degrees())
-                angle_animation_turning.call(frame,)
+                print("ShoulderRoll_n {} ShoulderPitch_n {} ".format(math.degrees(LElbowYaw_n), math.degrees(LElbowRoll_n)))
+
+                angle_animation1_n.call(frame,math.degrees(LElbowRoll_n))
+                angle_animation2_n.call(frame,math.degrees(LElbowYaw_n))
+                angle_animation1.call(frame,math.degrees(LElbowRoll))
+                angle_animation2.call(frame,math.degrees(LElbowYaw))
+
+                angle_animation_turningangle.call(frame,turningangle)
+                angle_animation_turning.call(frame, 180*Turning)
 
                 # angle_animation1_n.call(frame, LShoulderRoll_n)
                 # angle_animation2_n.call(frame, LShoulderPitch_n)
@@ -205,9 +220,11 @@ def main(args):
                 # arm_animation3.call(frame,lupperarm_t[2])
 
 
-                #! send ucp
-                message = np.array((frame,LShoulderRoll_n, LShoulderPitch_n, RShoulderRoll_n, 
-                        RShoulderPitch_n,LElbowYaw, LElbowRoll, LElbowYaw, LElbowRoll, Turning))
+                #! send udp
+                message = np.array((frame,
+                                    LShoulderRoll_n, LShoulderPitch_n, RShoulderRoll_n, RShoulderPitch_n, 
+                                    LElbowYaw_n, LElbowRoll_n, LElbowYaw_n, LElbowRoll_n, 
+                                    Turning))
                 MESSAGE = message.astype(np.float16).tostring()
                 sock.sendto(MESSAGE, (UDP_IP, UDP_PORT))
                 # print(sys.getsizeof(MESSAGE))

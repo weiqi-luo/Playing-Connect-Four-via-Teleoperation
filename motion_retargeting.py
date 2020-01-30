@@ -41,7 +41,7 @@ def compute_shoulder_rotation(upperarm, coord):
     print(upperarm_t)
     return roll, pitch, upperarm_t
 
-def compute_elbow_rotation(lowerarm, upperarm, coord):
+def compute_elbow_rotation(upperarm, lowerarm, coord):
     #! upperarm is from shoulder to elbow
     #! lowerarm is from elbow to wrests
     bx, by, bz, A = coord
