@@ -124,6 +124,8 @@ def main(args):
     ckpt, time3 = ckpt_time(time2)
 
     q_LShoulderPitch, q_RShoulderPitch, q_LShoulderRoll, q_RShoulderRoll = [deque(maxlen=7) for i in range(4) ]
+    q_LElbowYaw, q_RElbowYaw, q_LElbowRoll, q_RElbowRoll = [deque(maxlen=7) for i in range(4) ]
+
     try:
         while True:
             frame = -1
@@ -164,29 +166,37 @@ def main(args):
                     prediction[11], prediction[12], prediction[14], prediction[15], prediction[8], prediction[7], prediction[13], prediction[16]
                 LHip, RHip = prediction[4], prediction[1]
                 
-                larm_upper = LElbow - LShoulder
-                rarm_upper = RElbow - RShoulder
-                larm_lower = LElbow - LWrist
-                rarm_lower = RElbow - RWrist
+                left_upperarm = LElbow - LShoulder
+                right_upperarm = RElbow - RShoulder
+                left_lowerarm = LElbow - LWrist
+                right_lowerarm = RElbow - RWrist
                 
                 coord = compute_torso_coord(Neck, LHip, RHip)
-                LShoulderRoll, LShoulderPitch,lupperarm_t = compute_shoulder_rotation(larm_upper, coord)
-                RShoulderRoll, RShoulderPitch,rupperarm_t = compute_shoulder_rotation(rarm_upper, coord)
+
+                LShoulderRoll, LShoulderPitch,left_upperarm_t = compute_shoulder_rotation(left_upperarm, coord)
+                RShoulderRoll, RShoulderPitch,right_upperarm_t = compute_shoulder_rotation(right_upperarm, coord)
+                LElbowRoll, LElbowYaw, left_upperarm_t, left_lowerarm_t = compute_elbow_rotation(left_lowerarm, left_upperarm, coord)
+                RElbowRoll, RElbowYaw, right_upperarm_t, right_lowerarm_t = compute_elbow_rotation(right_lowerarm, right_upperarm, coord)
 
                 LShoulderPitch_n = filter_data(q_LShoulderPitch, LShoulderPitch, median_filter)
                 LShoulderRoll_n = filter_data(q_LShoulderRoll,  LShoulderRoll, median_filter)
                 RShoulderPitch_n = filter_data(q_RShoulderPitch, RShoulderPitch, median_filter)
                 RShoulderRoll_n = filter_data(q_RShoulderRoll,  RShoulderRoll, median_filter)
-                
 
+                LElbowYaw_n = filter_data(q_LElbowYaw, LElbowYaw, median_filter)
+                LElbowRoll_n = filter_data(q_LElbowRoll,  LElbowRoll, median_filter)
+                RElbowYaw_n = filter_data(q_RElbowYaw, RElbowYaw, median_filter)
+                RElbowRoll_n = filter_data(q_RElbowRoll,  RElbowRoll, median_filter)
+                
+                
                 # msg_LShoulderPitch = if q_LShoulderPitch.full()
                 
                 #! Plot angle
-                print("ShoulderRoll_n {} ShoulderPitch_n {} ".format(math.degrees(LShoulderRoll_n), math.degrees(LShoulderPitch_n)))
-                angle_animation1_n.call(frame,math.degrees(LShoulderRoll_n))
-                angle_animation2_n.call(frame,math.degrees(LShoulderPitch_n))
-                angle_animation1.call(frame,math.degrees(LShoulderRoll))
-                angle_animation2.call(frame,math.degrees(LShoulderPitch))
+                print("ElbowRoll_n {} ElbowPitch_n {} ".format(math.degrees(LElbowRoll_n), math.degrees(LElbowYaw_n)))
+                angle_animation1_n.call(frame,math.degrees(LElbowRoll_n))
+                angle_animation2_n.call(frame,math.degrees(LElbowYaw_n))
+                angle_animation1.call(frame,math.degrees(LElbowRoll))
+                angle_animation2.call(frame,math.degrees(LElbowYaw))
 
                 # angle_animation1_n.call(frame, LShoulderRoll_n)
                 # angle_animation2_n.call(frame, LShoulderPitch_n)
@@ -198,7 +208,7 @@ def main(args):
                 # arm_animation3.call(frame,lupperarm_t[2])
 
                 #! send ucp
-                message = np.array((frame,LShoulderRoll_n, LShoulderPitch_n, RShoulderRoll_n, RShoulderPitch_n))
+                message = np.array((frame, LElbowRoll_n, LElbowYaw_n, RElbowRoll_n, RElbowYaw_n))
                 MESSAGE = message.astype(np.float16).tostring()
                 sock.sendto(MESSAGE, (UDP_IP, UDP_PORT))
                 # print(sys.getsizeof(MESSAGE))

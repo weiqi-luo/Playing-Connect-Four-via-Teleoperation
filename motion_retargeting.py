@@ -49,13 +49,13 @@ def compute_elbow_rotation(lowerarm, upperarm, coord):
     lowerarm_t = np.dot(A, lowerarm)
 
     inner = np.inner(upperarm_t, lowerarm_t) / (LA.norm(upperarm_t) * LA.norm(lowerarm_t))
-    roll = -math.acos(inners)
+    roll = -math.acos(inner)
 
     m1 = np.cross(-bx, upperarm_t)
     m2 = np.cross(-upperarm_t, lowerarm_t)
     yaw = math.acos(np.dot(m1, m2) / (LA.norm(m1) * LA.norm(m2)))
 
-    return roll, yaw, upperarm_t, lowerarm_ts
+    return roll, yaw, upperarm_t, lowerarm_t
 
 
 def filter_data(Q:'deque', input, filter_func, **kw):
