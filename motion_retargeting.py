@@ -33,6 +33,8 @@ def compute_shoulder_rotation(upperarm, coord):
     return roll, pitch, upperarm_t
 
 def compute_elbow_rotation(lowerarm, upperarm, coord):
+    #! upperarm is from shoulder to elbow
+    #! lowerarm is from elbow to wrests
     bx, by, bz, A = coord
     upperarm_t = np.dot(A, upperarm)
     lowerarm_t = np.dot(A, lowerarm)
@@ -40,7 +42,7 @@ def compute_elbow_rotation(lowerarm, upperarm, coord):
     inner = np.inner(upperarm_t, lowerarm_t) / (LA.norm(upperarm_t) * LA.norm(lowerarm_t))
     roll = -math.acos(inners)
 
-    m1 = np.cross(bx, upperarm_t)
+    m1 = np.cross(-bx, upperarm_t)
     m2 = np.cross(-upperarm_t, lowerarm_t)
     yaw = math.acos(np.dot(m1, m2) / (LA.norm(m1) * LA.norm(m2)))
 
