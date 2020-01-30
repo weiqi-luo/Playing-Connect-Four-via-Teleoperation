@@ -5,6 +5,15 @@ import matplotlib.pyplot as plt
 from collections import deque
 from common.visualization import Sequencial_animation, RealtimePlot
 
+def compute_turning(vec):
+    angle = math.degrees(math.atan2(vec[0],vec[1]))
+    if abs(angle)>30:
+        turning = -math.copysign(1,angle)
+    else:
+        turning = 0
+    return turning,angle
+            
+
 
 def compute_torso_coord(neck, lhip, rhip):
     bz = np.cross((rhip - neck), (lhip - neck))
