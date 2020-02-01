@@ -5,6 +5,35 @@ import matplotlib.pyplot as plt
 from collections import deque
 from common.visualization import Sequencial_animation, RealtimePlot
 
+class Compute_walking:
+    def __init__(self):
+        self.old_walkingangle = None
+    
+    def __call__(self, walkingangle):
+        if self.old_walkingangle is None:
+            walking = 0
+        else:
+            walking = 1 if walkingangle*self.old_walkingangle < 0 else 0
+        self.old_walkingangle = walkingangle
+        return walking, walkingangle
+
+
+class Compute_squatting:
+    def __init__(self):
+        self.old_squattingangle = None
+
+    def __call__(self, upperleg, lowerleg):
+        inner = np.inner(upperleg, lowerleg) / (LA.norm(upperleg) * LA.norm(lowerleg))
+        squattingangle = math.degrees(math.acos(inner))
+        if self.old_squattingangle is None or self.old_squattingangle*squattingangle > 0:
+            squatting = 0
+        elif self.old_squattingangle > 90 and squattingangle < 90:
+            squattingangle = -1 
+        elif self.old_squattingangle < 90 and squattingangle > 90:
+            squattingangle = 1
+        return squatting,squattingangle
+
+
 def compute_turning(vec):
     angle = math.degrees(math.atan2(vec[0],vec[1]))
     if abs(angle)>30:
@@ -35,13 +64,11 @@ def compute_shoulder_rotation(upperarm, coord):
     inner = np.inner(plane, upperarm_t) / (LA.norm(plane) * LA.norm(upperarm_t))
     roll = -(np.pi/2 - math.acos(inner))
     # pitch = -math.atan2(upperarm_t[1], upperarm_t[2])
-    #
     # roll = math.atan2(upperarm_t[0], upperarm_t[2])
     pitch = math.atan2(-upperarm_t[1],math.sqrt(upperarm_t[0]**2 + upperarm_t[2]**2))
-    print(upperarm_t)
     return roll, pitch, upperarm_t
 
-def compute_elbow_rotation(upperarm, lowerarm, coord):
+def compute_elbow_rotation(upperarm, lowerarm, coord, neg):
     #! upperarm is from shoulder to elbow
     #! lowerarm is from elbow to wrests
     bx, by, bz, A = coord
@@ -49,11 +76,12 @@ def compute_elbow_rotation(upperarm, lowerarm, coord):
     lowerarm_t = np.dot(A, lowerarm)
 
     inner = np.inner(upperarm_t, lowerarm_t) / (LA.norm(upperarm_t) * LA.norm(lowerarm_t))
-    roll = -math.acos(inner)
+    # roll = -(np.pi/2 - math.acos(inner))
+    roll = neg*math.acos(inner)
 
     m1 = np.cross(-bx, upperarm_t)
     m2 = np.cross(-upperarm_t, lowerarm_t)
-    yaw = math.acos(np.dot(m1, m2) / (LA.norm(m1) * LA.norm(m2)))
+    yaw = math.acos(np.dot(m1, m2) / (LA.norm(m1) * LA.norm(m2))) - math.pi/2
 
     return yaw, roll, upperarm_t, lowerarm_t
 
