@@ -1,24 +1,15 @@
-import threading
+from threading import Thread, Event
+from time import sleep
 import time
-import socket
+import socket,sys
+import numpy as np
+from datetime import datetime
+# event = Event()
 
-exitFlag = 0
-count=1
-class MainThread (threading.Thread):
-    def __init__(self):
-        threading.Thread.__init__(self)
-
-    def run(self):
-        count+=1
-
-
-class TcpThread (threading.Thread):
-    def __init__(self):
-        threading.Thread.__init__(self)
-
-    def run(self):
+def tcpThread(var): 
+    try:       
         print ("Starting TCP server")
-        TCP_IP = '127.0.0.1'
+        TCP_IP = '192.168.1.43'
         TCP_PORT = 5005
         BUFFER_SIZE = 64  # Normally 1024, but we want fast response
 
@@ -31,20 +22,29 @@ class TcpThread (threading.Thread):
         while True:
             data = conn.recv(BUFFER_SIZE)
             if not data: 
-                print("no data")
+                print (time.ctime(time.time()))
                 continue
             print ("received data:", data)
-            conn.send(data)  # echo
+            if var[0] is not None:
+                print("sending")
+                conn.send(var[0])  # echo
+            print("aaaaaaaaaaaaaaaaaaaa")
+            # sys.exit()
+            
         print ("Exiting TCP")
+    finally:
+        s.close()
 
-
-# Create new threads
-tcpThread = TcpThread()
-
-tcpThread.start()
-# mainThread.start()
-tcpThread.join()
-while True:
-    print("a")
-# mainThread.join()
-print ("Exiting Main Thread")
+if __name__ == "__main__":    
+    my_var = [0]
+    t = Thread(target=tcpThread, args=(my_var, ))
+    t.start()
+    while True:
+        try:
+            print(my_var)
+            # sleep(1)
+        except KeyboardInterrupt:
+            # event.set()
+            break
+    t.join()
+    print(my_var)
