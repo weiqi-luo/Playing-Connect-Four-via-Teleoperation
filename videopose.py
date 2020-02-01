@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import click
 # from joints_detectors.openpose.main import generate_kpts as open_pose
 from pylab import get_current_fig_manager
-
+import threading
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"  # see issue #152
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 metadata = {'layout_name': 'coco', 'num_joints': 17, 'keypoints_symmetry': [[1, 3, 5, 7, 9, 11, 13, 15], [2, 4, 6, 8, 10, 12, 14, 16]]}
@@ -45,13 +45,26 @@ def main(args):
     #! UDP client
     import socket
 
-    UDP_IP = "192.168.1.42"
-    UDP_PORT = 9090
-    sock = socket.socket(socket.AF_INET, # Internet
-                        socket.SOCK_DGRAM) # UDP
+    # UDP_IP = "192.168.1.42"
+    # UDP_PORT = 9090
+    # sock = socket.socket(socket.AF_INET, # Internet
+    #                     socket.SOCK_DGRAM) # UDP
 
-    print ("UDP target IP:", UDP_IP)
-    print ("UDP target port:", UDP_PORT)
+    # print ("UDP target IP:", UDP_IP)
+    # print ("UDP target port:", UDP_PORT)
+
+    #! TCP server 
+    TCP_IP = "192.168.1.42"
+    TCP_PORT = 5005
+    BUFFER_SIZE = 64  # Normally 1024, but we want fast response
+
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind((TCP_IP, TCP_PORT))
+    s.listen(1)
+
+    conn, addr = s.accept()
+    print ('Connection address:', addr)
+
 
     #! read image from camera   
     from joints_detectors.Alphapose.video2d import DetectionLoader
@@ -233,7 +246,16 @@ def main(args):
                                     LElbowYaw_n, LElbowRoll_n, RElbowYaw_n, RElbowRoll_n, 
                                     Turning, squatting, walking))
                 MESSAGE = message.astype(np.float16).tostring()
-                sock.sendto(MESSAGE, (UDP_IP, UDP_PORT))
+                # sock.sendto(MESSAGE, (UDP_IP, UDP_PORT))
+
+
+                data = conn.recv(BUFFER_SIZE)
+                if not data: continue
+                print ("received data:", data)
+                conn.send(data)  # echo
+                conn.close()
+
+
                 # print(sys.getsizeof(MESSAGE))
                 print(Turning, squatting, walking)
                 # print(message)
