@@ -113,7 +113,11 @@ class DetectionLoader:
 
         _, frame = self.stream.read()
         # frame = cv2.resize(frame, (frame.shape[1]//2,frame.shape[0]//2))
-        # frame = frame[:,:150,:]
+
+        #TODO TESTING
+        frame[:,:200,:]=0
+        frame[:,450:,:]=0
+
 
         img_k, self.orig_img, im_dim_list_k = prep_frame(frame, self.inp_dim)
         

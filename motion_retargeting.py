@@ -5,12 +5,44 @@ import matplotlib.pyplot as plt
 from collections import deque
 from common.visualization import Sequencial_animation, RealtimePlot
 
+
+class Compute_moving:
+    def __init__(self):
+        self.old_leftmoving = False # 3
+        self.old_rightmoving = False # 1
+
+    def __call__(self,top):
+        top = top/640
+        if 0.45 < top < 0.55:
+            if self.old_leftmoving or self.old_rightmoving:
+                moving = 2
+                self.old_leftmoving = False
+                self.old_rightmoving = False
+            else: 
+                moving = 0
+        elif top<0.5:
+            if self.old_rightmoving:
+                moving = 0
+            else:
+                moving = 1 #right
+                self.old_rightmoving = True
+        else:
+            if self.old_leftmoving:
+                moving = 0
+            else:
+                moving = 3 #left
+                self.old_leftmoving = True
+            
+        return moving, top
+
+
+
 class Compute_walking:
     def __init__(self):
         self.old_walkingangle = None
     
     def __call__(self, walkingangle):
-        if self.old_walkingangle is None:
+        if self.old_walkingangle is None or walkingangle<0.04:
             walking = 0
         else:
             walking = 1 if walkingangle*self.old_walkingangle < 0 else 0
@@ -20,32 +52,76 @@ class Compute_walking:
 
 class Compute_squatting:
     def __init__(self):
-        self.old_squattingangle = None
+        self.old_squattingangle_left = False
+        self.old_squattingangle_right = False
+
 
     def __call__(self, upperleg, lowerleg):
-        inner = np.inner(upperleg, lowerleg) / (LA.norm(upperleg) * LA.norm(lowerleg))
-        squattingangle = math.degrees(math.acos(inner))
-        if self.old_squattingangle is None or self.old_squattingangle*squattingangle > 0:
+        left_upperleg, right_upperleg = upperleg
+        left_lowerleg, right_lowerleg = lowerleg
+
+        inner_left = np.inner(left_upperleg, left_lowerleg) / (LA.norm(left_upperleg) * LA.norm(left_lowerleg))
+        inner_right = np.inner(right_upperleg, right_lowerleg) / (LA.norm(right_upperleg) * LA.norm(right_lowerleg))
+
+        squattingangle_left = math.degrees(math.acos(inner_left))
+        squattingangle_right = math.degrees(math.acos(inner_right))
+
+        squatting = 0
+        # print("squatting {} ".format(self.old_squattingangle))
+        if (self.old_squattingangle_left-100)*(squattingangle_left-100) > 0 and (self.old_squattingangle_right-100)*(squattingangle_right-100):
             squatting = 0
-        elif self.old_squattingangle > 90 and squattingangle < 90:
-            squattingangle = -1 
-        elif self.old_squattingangle < 90 and squattingangle > 90:
-            squattingangle = 1
-        return squatting,squattingangle
+        elif self.old_squattingangle_left > 100 and self.old_squattingangle_right > 100 and squattingangle_left < 100 and squattingangle_left < 100:
+            squatting = -1 
+        elif self.old_squattingangle_left < 100 and squattingangle_left > 100 and self.old_squattingangle_right < 100 and squattingangle_right > 100:
+            squatting = 1
+        self.old_squattingangle_left = squattingangle_left
+        self.old_squattingangle_right = squattingangle_right
+
+        return squatting, squattingangle_left, squattingangle_right
 
 
-def compute_turning(vec):
-    angle = math.degrees(math.atan2(vec[0],vec[1]))
-    if abs(angle)>30:
-        turning = -math.copysign(1,angle)
-    else:
-        turning = 0
-    return turning,angle
+class Compute_turning:
+    def __init__(self):
+        self.left_turning = False # 3
+        self.right_turning = False # 1
+
+
+    def __call__(self, vec):
+        """
+        0: do nothing  1: turn right  2: stop  3: turn left 
+        """
+        angle = math.degrees(math.atan2(vec[0],vec[1]))
+        if abs(angle)<30: # stop or do nothing
+            if self.left_turning or self.right_turning:
+                turning = 2
+                self.left_turning = False
+                self.right_turning = False
+            else: 
+                turning = 0  
+
+        elif angle>0: # turn right or do nothing
+            turning = 0 if self.right_turning else 1 
+            self.right_turning = True
+
+        else: # turn left
+            turning = 0 if self.left_turning else 3 
+            self.left_turning = True
+            
+        return turning,angle
+
+
+# def compute_turning(vec):
+#     angle = math.degrees(math.atan2(vec[0],vec[1]))
+#     if abs(angle)>30:
+#         turning = -math.copysign(1,angle)
+#     else:
+#         turning = 0
+#     return turning,angle
             
 
 
-def compute_torso_coord(neck, lhip, rhip):
-    bz = np.cross((rhip - neck), (lhip - neck))
+def compute_torso_coord(top, lhip, rhip):
+    bz = np.cross((rhip - top), (lhip - top))
     bz = bz/LA.norm(bz)
     bx = lhip - rhip
     bx = bx/LA.norm(bx)

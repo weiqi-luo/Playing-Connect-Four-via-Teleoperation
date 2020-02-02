@@ -6,7 +6,7 @@ import numpy as np
 from datetime import datetime
 # event = Event()
 
-def tcpThread(var): 
+def tcpThread(var, event): 
     try:       
         print ("Starting TCP server")
         TCP_IP = '192.168.1.43'
@@ -26,13 +26,12 @@ def tcpThread(var):
                 continue
             print ("received data:", data)
             if var[0] is not None:
-                print("sending")
                 conn.send(var[0])  # echo
-            print("aaaaaaaaaaaaaaaaaaaa")
             # sys.exit()
             
         print ("Exiting TCP")
     finally:
+        event.set()
         s.close()
 
 if __name__ == "__main__":    
