@@ -12,15 +12,14 @@ class Compute_moving:
         self.old_rightmoving = False # 1
 
     def __call__(self,top):
-        top = top/640
-        if 0.45 < top < 0.55:
+        if abs(top)<0.22:
             if self.old_leftmoving or self.old_rightmoving:
                 moving = 2
                 self.old_leftmoving = False
                 self.old_rightmoving = False
             else: 
                 moving = 0
-        elif top<0.5:
+        elif top>0:
             if self.old_rightmoving:
                 moving = 0
             else:

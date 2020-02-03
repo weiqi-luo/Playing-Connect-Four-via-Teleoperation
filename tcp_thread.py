@@ -3,14 +3,15 @@ from time import sleep
 import time
 import socket,sys
 import numpy as np
-from datetime import datetime
+import datetime
 # event = Event()
 
 def tcpThread(var, event): 
+    dt = datetime.datetime
     try:       
         print ("Starting TCP server")
         TCP_IP = '192.168.1.43'
-        TCP_PORT = 5005
+        TCP_PORT = dt.now().hour*100 + dt.now().minute
         BUFFER_SIZE = 64  # Normally 1024, but we want fast response
 
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

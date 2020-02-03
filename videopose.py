@@ -192,8 +192,7 @@ def main(args):
                 Turning, turningangle = compute_turning(coord[2])
                 walking, walkingangle = compute_walking(LAnkle[1] - RAnkle[1])
                 squatting, squattingangle_left, squattingangle_right = compute_squatting((left_upperleg, right_upperleg), (left_lowerleg, right_lowerleg))
-                moving, movingangle = compute_moving(Top)
-                print(kp[10,0])
+                moving, movingangle = compute_moving(Top[0]-(RAnkle[0]+LAnkle[0])/2)
 
                 #### Filtering ####
                 LShoulderPitch_n = filter_data(q_LShoulderPitch, LShoulderPitch, median_filter)
@@ -222,20 +221,21 @@ def main(args):
                 # ani1_y.call(frame,   LShoulderRoll)
                 # ani2_y.call(frame,   LShoulderPitch)
 
-                ani1_y.call(frame,turningangle)
-                ani1_r.call(frame, 60*Turning)
+                # ani1_y.call(frame,turningangle)
+                # ani1_r.call(frame, 60*Turning)
 
-                # ani2_y.call(frame,squattingangle)
-                ani2_r.call(frame, 180*squatting)
+                # # ani2_y.call(frame,squattingangle)
+                # ani2_r.call(frame, 180*squatting)
 
-                ani3_y.call(frame,walkingangle)
-                ani3_r.call(frame,180* walking)
+                # ani3_y.call(frame,walkingangle)
+                # ani3_r.call(frame,180* walking)
 
-                ani4_y.call(frame,180*movingangle)
-                ani4_r.call(frame, 60*moving)
+                # ani4_y.call(frame,3*180*movingangle)
+                # ani4_r.call(frame, 60*moving)
+                # print(movingangle)
                 
                 
-                print("moving {} ".format(moving))
+                # print("moving {} ".format(moving))
                 
 
                 #! send udp
