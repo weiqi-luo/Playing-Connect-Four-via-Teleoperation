@@ -68,14 +68,23 @@ def main(args):
     ax3 = fig_angle.add_subplot(413)
     ax4 = fig_angle.add_subplot(414)
 
-    ani1_r = RealtimePlot(fig_angle, ax1, "LShoulderRoll","r")
-    ani1_y = RealtimePlot(fig_angle, ax1, "LShoulderRoll","y")
-    ani2_r = RealtimePlot(fig_angle, ax2, "LShoulderPitch","r")
-    ani2_y = RealtimePlot(fig_angle, ax2, "LShoulderPitch","y")
-    ani3_r = RealtimePlot(fig_angle, ax3, "turning","r")
-    ani3_y = RealtimePlot(fig_angle, ax3, "turning angle","y")
-    ani4_r = RealtimePlot(fig_angle, ax4, "turning","r")
-    ani4_y = RealtimePlot(fig_angle, ax4, "turning angle","y")
+    # ani1_r = RealtimePlot(fig_angle, ax1, "squatting","r")
+    # ani1_y = RealtimePlot(fig_angle, ax1, "squatting","y")
+    # ani2_r = RealtimePlot(fig_angle, ax2, "turning","r")
+    # ani2_y = RealtimePlot(fig_angle, ax2, "turning","y")
+    # ani3_r = RealtimePlot(fig_angle, ax3, "moving","r")
+    # ani3_y = RealtimePlot(fig_angle, ax3, "moving","y")
+    # ani4_r = RealtimePlot(fig_angle, ax4, "walking","r")
+    # ani4_y = RealtimePlot(fig_angle, ax4, "walking","y")
+
+    ani1_r = RealtimePlot(fig_angle, ax1, "LElbowRoll_filtered","r")
+    ani1_y = RealtimePlot(fig_angle, ax1, "LElbowRoll","y")
+    ani2_r = RealtimePlot(fig_angle, ax2, "LElbowYaw_filtered","r")
+    ani2_y = RealtimePlot(fig_angle, ax2, "LElbowYaw","y")
+    ani3_r = RealtimePlot(fig_angle, ax3, "LShoulderRoll_filtered","r")
+    ani3_y = RealtimePlot(fig_angle, ax3, "LShoulderRoll","y")
+    ani4_r = RealtimePlot(fig_angle, ax4, "LShoulderPitch_filtered","r")
+    ani4_y = RealtimePlot(fig_angle, ax4, "LShoulderPitch","y")
     
     thismanager = get_current_fig_manager()
     thismanager.window.wm_geometry("+1000+0")
@@ -113,15 +122,12 @@ def main(args):
     joints_left, joints_right = list([4, 5, 6, 11, 12, 13]), list([1, 2, 3, 14, 15, 16])
     rot = np.array([0.14070565, -0.15007018, -0.7552408, 0.62232804], dtype=np.float32)
     kp_deque = deque(maxlen=9)
-    compute_walking = Compute_walking()
-    compute_squatting = Compute_squatting()
-    compute_turning = Compute_turning()
-    compute_moving = Compute_moving()
-    
+    compute_walking = Compute_walking() 
 
 
     #! loop through the frame (now fake frame)
     ckpt, time3 = ckpt_time(time2)
+
 
     #! Prepare deque for 8 joints
     q_LShoulderPitch, q_RShoulderPitch, q_LShoulderRoll, q_RShoulderRoll = [deque(maxlen=7) for i in range(4)]
@@ -133,18 +139,17 @@ def main(args):
                 ckpt, time3 = ckpt_time(time3)
                 frame += 1
                 print("------------------- frame ",frame, '-------- generate reconstruction 3D data spends {:.2f} seconds'.format(ckpt))
-                
+
+
                 #! get 2d key points
                 kp = det_loader.update()
                 if kp is None:
                     continue
-
         
                 kp_deque.append(kp.numpy())    
                 if len(kp_deque)<9:
                     continue
                 
-
 
                 #! estimate 3d pose 
                 # normlization keypoints  Suppose using the camera parameter
@@ -162,6 +167,7 @@ def main(args):
                 #! Visualize 3d
                 prediction = prediction[8]
                 pose3d_animation.call(prediction)
+
 
                 #! Motion retargeting
                 MHip, RHip, RKnee, RAnkle, LHip, LKnee, LAnkle, Waist, Neck, Face, Top, \
@@ -189,10 +195,11 @@ def main(args):
                 LElbowYaw, LElbowRoll, left_upperarm_t, left_lowerarm_t = compute_elbow_rotation(left_upperarm, left_lowerarm, coord, -1)
                 RElbowYaw, RElbowRoll, right_upperarm_t, right_lowerarm_t = compute_elbow_rotation(right_upperarm, right_lowerarm, coord, 1)
 
-                Turning, turningangle = compute_turning(coord[2])
+                Turning, turningangle = get_turning(coord[2])
                 walking, walkingangle = compute_walking(LAnkle[1] - RAnkle[1])
-                squatting, squattingangle_left, squattingangle_right = compute_squatting((left_upperleg, right_upperleg), (left_lowerleg, right_lowerleg))
-                moving, movingangle = compute_moving(Top[0]-(RAnkle[0]+LAnkle[0])/2)
+                squatting, squattingangle_left, squattingangle_right = get_squatting(
+                    left_upperleg, left_lowerleg, right_upperleg, right_lowerleg)
+                moving, movingangle = get_moving(Top[0]-(RAnkle[0]+LAnkle[0])/2)
 
                 #### Filtering ####
                 LShoulderPitch_n = filter_data(q_LShoulderPitch, LShoulderPitch, median_filter)
@@ -205,38 +212,34 @@ def main(args):
                 RElbowYaw_n = filter_data(q_RElbowYaw, RElbowYaw, median_filter)
                 RElbowRoll_n = filter_data(q_RElbowRoll,  RElbowRoll, median_filter)
 
-
-                # msg_LShoulderPitch = if q_LShoulderPitch.full()
-
-
                 
                 #! Plot angle
                 # ani1_r.call(frame,math.degrees(LElbowRoll_n))
-                # ani2_r.call(frame,math.degrees(LElbowYaw_n))
                 # ani1_y.call(frame,math.degrees(LElbowRoll))
+                # ani2_r.call(frame,math.degrees(LElbowYaw_n))
                 # ani2_y.call(frame,math.degrees(LElbowYaw))
+                # ani3_r.call(frame,math.degrees(LShoulderRoll_n))
+                # ani3_y.call(frame,math.degrees(LShoulderRoll))
+                # ani4_r.call(frame,math.degrees(LShoulderPitch_n))
+                # ani4_y.call(frame,math.degrees(LShoulderPitch))
 
                 # ani1_r.call(frame, LShoulderRoll_n)
                 # ani2_r.call(frame, LShoulderPitch_n)
                 # ani1_y.call(frame,   LShoulderRoll)
                 # ani2_y.call(frame,   LShoulderPitch)
 
-                # ani1_y.call(frame,turningangle)
-                # ani1_r.call(frame, 60*Turning)
+                # # ani1_y.call(frame,squattingangle)
+                # ani1_r.call(frame, 180*squatting)
 
-                # # ani2_y.call(frame,squattingangle)
-                # ani2_r.call(frame, 180*squatting)
+                # # ani2_y.call(frame,turningangle)
+                # ani2_r.call(frame, 60*Turning)
 
-                # ani3_y.call(frame,walkingangle)
-                # ani3_r.call(frame,180* walking)
+                # # ani3_y.call(frame,3*180*movingangle)
+                # ani3_r.call(frame, 60*moving)
 
-                # ani4_y.call(frame,3*180*movingangle)
-                # ani4_r.call(frame, 60*moving)
-                # print(movingangle)
-                
-                
-                # print("moving {} ".format(moving))
-                
+                # # ani4_y.call(frame,walkingangle)
+                # ani4_r.call(frame,180* walking)
+                             
 
                 #! send udp
                 message = np.array((frame,

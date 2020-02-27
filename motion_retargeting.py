@@ -6,6 +6,47 @@ from collections import deque
 from common.visualization import Sequencial_animation, RealtimePlot
 
 
+
+def get_squatting(left_upperleg, left_lowerleg, right_upperleg, right_lowerleg):
+
+    inner_left = np.inner(left_upperleg, left_lowerleg) / (LA.norm(left_upperleg) * LA.norm(left_lowerleg))
+    inner_right = np.inner(right_upperleg, right_lowerleg) / (LA.norm(right_upperleg) * LA.norm(right_lowerleg))
+
+    squattingangle_left = math.degrees(math.acos(inner_left))
+    squattingangle_right = math.degrees(math.acos(inner_right))
+
+    squatting = 1 if squattingangle_left<100 and squattingangle_right<100 else 0
+
+    return squatting, squattingangle_left, squattingangle_right
+
+
+def get_turning(vec):
+    """
+    0: do nothing or stop  1: turn right  2: turn left
+    """
+    angle = math.degrees(math.atan2(vec[0],vec[1]))
+    if abs(angle)<30: # stop or do nothing
+        turning = 0
+
+    else:
+        turning = 1 if angle>0 else 2
+        
+    return turning,angle
+
+
+def get_moving(top):
+    """
+    0: do nothing or stop  1: go right 2: go left
+    """
+    if abs(top)<0.22:
+        moving = 0
+    elif top>0:
+        moving = 1 #right
+    else:
+        moving = 2 #left        
+    return moving, top
+
+
 class Compute_moving:
     def __init__(self):
         self.old_leftmoving = False # 3
@@ -65,18 +106,11 @@ class Compute_squatting:
         squattingangle_left = math.degrees(math.acos(inner_left))
         squattingangle_right = math.degrees(math.acos(inner_right))
 
-        squatting = 0
-        # print("squatting {} ".format(self.old_squattingangle))
-        if (self.old_squattingangle_left-100)*(squattingangle_left-100) > 0 and (self.old_squattingangle_right-100)*(squattingangle_right-100):
-            squatting = 0
-        elif self.old_squattingangle_left > 100 and self.old_squattingangle_right > 100 and squattingangle_left < 100 and squattingangle_left < 100:
-            squatting = -1 
-        elif self.old_squattingangle_left < 100 and squattingangle_left > 100 and self.old_squattingangle_right < 100 and squattingangle_right > 100:
-            squatting = 1
-        self.old_squattingangle_left = squattingangle_left
-        self.old_squattingangle_right = squattingangle_right
+        squatting = 1 if squattingangle_left<100 and squattingangle_right<100 else 0
 
         return squatting, squattingangle_left, squattingangle_right
+
+
 
 
 class Compute_turning:
@@ -108,15 +142,6 @@ class Compute_turning:
             
         return turning,angle
 
-
-# def compute_turning(vec):
-#     angle = math.degrees(math.atan2(vec[0],vec[1]))
-#     if abs(angle)>30:
-#         turning = -math.copysign(1,angle)
-#     else:
-#         turning = 0
-#     return turning,angle
-            
 
 
 def compute_torso_coord(top, lhip, rhip):

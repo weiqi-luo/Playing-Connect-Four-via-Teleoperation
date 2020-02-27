@@ -11,7 +11,7 @@ def tcpThread(var, event):
     try:       
         print ("Starting TCP server")
         TCP_IP = '192.168.1.43'
-        TCP_PORT = dt.now().hour*100 + dt.now().minute
+        TCP_PORT = dt.now().hour*100 + dt.now().minute + 1024
         BUFFER_SIZE = 64  # Normally 1024, but we want fast response
 
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
