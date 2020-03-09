@@ -69,6 +69,7 @@ The 3D human pose is estimated by employing a three-stage deep neural network. F
 </p>
 
 ## 2. Motion Retargeting [2]
+
 The retargeting of the arm motion
 is done by replicating the corresponding joint angles
 from the estimated 3D human model to the
@@ -77,6 +78,14 @@ robot joint space.
 Besides the arm motion, we can also remote control the robot to walk, by sending the command of target velocity
 to the robot when detecting that the human master is walking
 or turning. 
+
+<p align="center">
+    <img src="pics/bodyreconstruction.png", width="500">
+    <br>
+    <sup>Reconstructed 3D human models: 
+     (a) squatting, (b) moving forwards, (c) moving sidewards, (d) turning. </sup>
+</p>
+
 # References
 [1] Pavllo, Dario, et al. ”3D human pose estimation in video with temporal
 convolutions and semi-supervised training.” Proceedings of the IEEE
