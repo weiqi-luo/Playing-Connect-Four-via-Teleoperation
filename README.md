@@ -1,131 +1,85 @@
-# Video to Pose3D
+# Introduction
+The objective of this project is to teleoperate the NAO robot to play connect-four against a human. In each round of the game, NAO will first grab a ping-pong ball of a specific color as a game token, then imitate the movement of the human master, which is observed by a monocular camera, walking to
+the game board and dropping the token into the desired slot in order to win the game.
 
-> Predict 3d human pose from video
+<p align="center">
+    <img src="pics/intro2.png", width="400">
+    <br>
+    <sup>NAO playing connect four via teleoperation</sup>
+</p>
 
-<p align="center"><img src="asset/kunkun_alphapose.gif" width="100%" alt="" /></p>
+# Requirements
 
-## Prerequisite
+- PC 1 with a rgb camera:
 
-1. Environment
-   - Linux system
-   - Python > 3.6 distribution
-2. Dependencies
-   - **Packages**
-      - Pytorch > 1.0.0
-      - [torchsample](https://github.com/MVIG-SJTU/AlphaPose/issues/71#issuecomment-398616495)
-      - [ffmpeg](https://ffmpeg.org/download.html)
-      - tqdm
-      - pillow
-      - scipy
-      - pandas
-      - h5py
-      - visdom
-      - nibabel
-      - opencv-python (install with pip)
-      - matplotlib
-   - **2D Joint detectors**
-     - Alphapose (Recommended)
-       - Download **duc_se.pth** from ([Google Drive](https://drive.google.com/open?id=1OPORTWB2cwd5YTVBX-NE8fsauZJWsrtW) | [Baidu pan](https://pan.baidu.com/s/15jbRNKuslzm5wRSgUVytrA)),
-         place to `./joints_detectors/Alphapose/models/sppe`
-       - Download **yolov3-spp.weights** from ([Google Drive](https://drive.google.com/open?id=1D47msNOOiJKvPOXlnpyzdKA3k6E97NTC) | [Baidu pan](https://pan.baidu.com/s/1Zb2REEIk8tcahDa8KacPNA)),
-         place to `./joints_detectors/Alphapose/models/yolo`
-     - HR-Net (Bad 3d joints performance in my testing environment)
-       - Download **pose_hrnet*** from [Google Drive](https://drive.google.com/drive/folders/1nzM_OBV9LbAEA7HClC0chEyf_7ECDXYA) | [Baidu pan](https://pan.baidu.com/s/1v6dov-TyPVOtejTNF1HXrA)), 
-         place to `./joints_detectors/hrnet/models/pytorch/pose_coco/`
-       - Download **yolov3.weights** from [here](https://pjreddie.com/media/files/yolov3.weights),
-         place to `./joints_detectors/hrnet/lib/detector/yolo`
-     - OpenPose (Not tested, PR to README.md is highly appreciated )
-   - **3D Joint detectors**
-      - Download **pretrained_h36m_detectron_coco.bin** from [here](https://dl.fbaipublicfiles.com/video-pose-3d/pretrained_h36m_detectron_coco.bin),
-        place it into `./checkpoint` folder
-   - **2D Pose trackers (Optional)**
-      - PoseFlow (Recommended)
-        No extra dependences
-      - LightTrack (Bad 2d tracking performance in my testing environment)
-        - See [original README](https://github.com/Guanghan/lighttrack), and perform same *get started step* on `./pose_trackers/lighttrack`
+  python 3.6
+
+  cuda (tested with version 10.1)
+
+  pytorch (tested with version 1.4)
+
+- PC 2:
+
+  python 2.7
+
+  ROS (tested with version kinetic)
+
+- Internet connection bwtween PC 1 and PC 2.
 
 
 
-## Usage
+# Usage
 
-0. place your video into `./outputs` folder. (I've prepared a test video).
+1. On PC1:
 
-##### Single person video
+   ```
+   $ python videopose.py
+   ```
 
-1. change the `video_path` in the `./videopose.py`
-2. Run it! You will find the rendered output video in the `./outputs` folder.
+2. On PC2:
 
-##### Multiple person video (Not implemented yet)
-
-1. For developing, check `./videopose_multi_person`
-
-   ```python
-   video = 'kobe.mp4'
-   
-   handle_video(f'outputs/{video}') 
-   # Run AlphaPose, save the result into ./outputs/alpha_pose_kobe
-   
-   track(video)					 
-   # Taking the result from above as the input of PoseTrack, output poseflow-results.json # into the same directory of above. 
-   # The visualization result is save in ./outputs/alpha_pose_kobe/poseflow-vis
-   
-   # TODO: Need more action:
-   #  1. "Improve the accuracy of tracking algorithm" or "Doing specific post processing 
-   #     after getting the track result".
-   #  2. Choosing person(remove the other 2d points for each frame)
+   ```
+   $ roslaunch nao_bringup nao_full.launch
+   $ roslaunch final_project nao.launch
    ```
 
 
 
 
-##### Tips
-0. The [PyCharm](https://www.jetbrains.com/pycharm/) is recommended since it is the IDE I'm using during development.
-1. If you're using PyCharm, mark `./joints_detectors/Alphapose`, `./joints_detectors/hrnet` and `./pose_trackers` as source root.
-2. If your're trying to run in command line, add these paths mentioned above to the sys.path at the head of `./videopose.py`
+ Please make sure to first launch the process on PC 1.  
+ If process on one of the PC crashes, please also terminate the process on another PC and then relaunch everything.
 
-## Advanced
+# Methods
 
-As this script is based on the [VedioPose3D](https://github.com/facebookresearch/VideoPose3D) provided by Facebook, and automated in the following way:
+Since the 3D human pose estimation using deep neural network is very computationally intensive, we use a non-ros computer with strong GPU to perform the pose estimation, and another computer with ros to commu-
+nicate with NAO humanoid robot. The connection between these two computers is established using TCP/IP.
 
-```python
-args = parse_args()
+<p align="center">
+    <img src="pics/sysstructure.png", width="300">
+    <br>
+    <sup>System architecture</sup>
+</p>
 
-args.detector_2d = 'alpha_pose'
-dir_name = os.path.dirname(video_path)
-basename = os.path.basename(video_path)
-video_name = basename[:basename.rfind('.')]
-args.viz_video = video_path
-args.viz_output = f'{dir_name}/{args.detector_2d}_{video_name}.gif'
+## 1. 3D Human Pose Estimation [1]
+The 3D human pose is estimated by employing a three-stage deep neural network. Firstly, YOLO v3 detects the person on the rgb images. next, Alphapose extracts 2D human keypoints of the detected person. Based on the 2D keypoints, the last network, VideoPose3d is able to estimate 3D human keypoints. 
+<p align="center">
+    <img src="pics/pipeline.png", width="350">
+    <br>
+    <sup>3D pose estimation pipeline</sup>
+</p>
 
-args.evaluate = 'pretrained_h36m_detectron_coco.bin'
+## 2. Motion Retargeting [2]
+The retargeting of the arm motion
+is done by replicating the corresponding joint angles
+from the estimated 3D human model to the
+robot joint space.   
 
-with Timer(video_path):
-    main(args)
-```
+Besides the arm motion, we can also remote control the robot to walk, by sending the command of target velocity
+to the robot when detecting that the human master is walking
+or turning. 
+# References
+[1] Pavllo, Dario, et al. ”3D human pose estimation in video with temporal
+convolutions and semi-supervised training.” Proceedings of the IEEE
+Conference on Computer Vision and Pattern Recognition. 2019.  
 
-The meaning of arguments can be found [here](https://github.com/facebookresearch/VideoPose3D/blob/master/DOCUMENTATION.md), you can customize it conveniently by changing the `args` in `./videopose.py`.
-
-
-
-## Acknowledgement
-
-The 2D pose to 3D pose and visualization part is from [VideoPose3D](https://github.com/facebookresearch/VideoPose3D).
-
-Some of the "In the wild" script is adapted from the other [fork](https://github.com/tobiascz/VideoPose3D).
-
-The project structure and `./videopose.py` running script is adapted from [this repo](https://github.com/lxy5513/videopose)
-
-
-
-## Coming soon
-
-The other feature will be added to improve accuracy in the future:
-
-- [x] Human completeness check.
-- [x] Object Tracking to the first complete human covering largest area.
-- [x] Change 2D pose estimation method such as [AlphaPose](https://github.com/MVIG-SJTU/AlphaPose).
-- [x] Test HR-Net as 2d joints detector.
-- [x] Test LightTrack as pose tracker.
-- [ ] Multi-person video(complex) support.
-- [ ] Data augmentation to solve "high-speed with low-rate" problem: [SLOW-MO](https://github.com/avinashpaliwal/Super-SloMo).
-
+[2] Franz, Sven, Ralph Nolte-Holube, and Frank Wallhoff. "NAFOME: NAO Follows Me-tracking, reproduction and simulation of human motion." Jade University of Applied Sciences, Germany (2013).
